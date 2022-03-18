@@ -1,0 +1,20 @@
+{
+    :meta {
+        :author "Michał Wilk"
+        :version ""
+        :shortname "hello"
+        :created-at nil
+        :updated-at nil
+    }
+    :objects (
+        {
+            :name {
+                :singular "greeting"
+            }
+            :driver "CONFIG-MAP"
+            :data {
+                :hello "world"
+            }
+        }
+    )
+}
