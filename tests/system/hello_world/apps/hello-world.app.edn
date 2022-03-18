@@ -1,0 +1,9 @@
+{:meta {:author "Michał Wilk",
+        :created-at nil,
+        :services nil,
+        :shortname "hello",
+        :updated-at nil,
+        :version nil},
+ :objects
+   ({:data {:hello "world"}, :driver "map-object", :url-name "hello-world"}
+    {:url-name "videos"})}

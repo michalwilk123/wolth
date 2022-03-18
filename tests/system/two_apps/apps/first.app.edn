@@ -1,0 +1,15 @@
+{
+    :meta {
+        :shortname "sec"
+    }
+    :objects (
+        {
+            :name {
+            }
+            :driver "map-object"
+            :data {
+                :myObject "second"
+            }
+        }
+    )
+}

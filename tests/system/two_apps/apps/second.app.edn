@@ -1,0 +1,14 @@
+{
+    :meta {
+        :shortname "sec"
+    }
+    :objects (
+        {
+            :url-name "second"
+            :driver "map-object"
+            :data {
+                :myObject "second"
+            }
+        }
+    )
+}
