@@ -5,5 +5,5 @@
         :updated-at nil,
         :version nil},
  :objects
-   ({:data {:hello "world"}, :driver "map-object", :url-name "hello-world"}
-    {:url-name "videos"})}
+   [{:data {:hello "world"}, :driver "map-object", :url-name "hello-world"}
+    {:url-name "videos"}]}

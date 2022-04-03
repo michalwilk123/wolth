@@ -1,9 +1,0 @@
-{:deps
- {io.pedestal/pedestal.service {:mvn/version "0.5.7"}
-  io.pedestal/pedestal.route   {:mvn/version "0.5.7"}
-  io.pedestal/pedestal.jetty   {:mvn/version "0.5.7"}
-  com.github.seancorfield/honeysql  {:mvn/version "2.2.861"}
-  com.github.seancorfield/next.jdbc {:mvn/version "1.2.772"}
-  com.h2database/h2            {:mvn/version "1.4.199"}
-  org.slf4j/slf4j-simple       {:mvn/version "1.7.28"}}
- :paths ["src"]}
