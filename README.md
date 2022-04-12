@@ -15,7 +15,6 @@ For unit tests, we will be using build in clojure.test library
 Imo niepotrzebne będzie dodawanie odświeżania póki co.
 Najważniejsze żeby przeładowywanie działało.
 
-Można się pobawić we wczytywanie pliku
 
 
 ## Getting Started
