@@ -41,4 +41,5 @@ build/
 .cpcache
 __pycache__
 
-
+.clj-kondo
+.lsp
