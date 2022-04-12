@@ -1,9 +1,10 @@
-{:interceptors {
-                :all [:json]
-                :delete [:send-mail]
-                :custom [:test-intercep :another]},
- :meta {:author "Michał Wilk", :shortname "hello", :version nil},
- :objects [ {:default-data {:hello "world"},
+{:interceptors {:all {:json nil}
+                :delete {:send-mail nil}
+                :custom {:test-intercep nil :another nil}
+                :specification {:send-mail "path-to-send-mail-intercep.clj"}
+                :args {:log {:level :INFO}}},
+ :meta {:author "Adam Nowak", :shortname "hello", :version nil},
+ :objects [ {:default-data { :data {:hello "world"} :status 200 :headers nil},
             :url-name "hello-world"
             :join-with []}
            {:url-name "videos" :name "FILMY" :additional-interceptors [:custom]} ]}
