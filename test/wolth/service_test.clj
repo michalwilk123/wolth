@@ -1,6 +1,6 @@
 (ns wolth.service-test
-  (:require [clojure.test :refer :all]
-            [io.pedestal.test :refer :all]
+  (:require [clojure.test :refer [ deftest is]]
+            [io.pedestal.test :refer [response-for]]
             [io.pedestal.http :as bootstrap]
             [wolth.service :as service]))
 
