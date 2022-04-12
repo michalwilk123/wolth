@@ -21,7 +21,10 @@
 
 (defn home-page
   [request]
-  (ring-resp/response "faraon mumia znowu rozpierdala cały kosmos 3"))
+  (ring-resp/response "oooooooooooooooo"))
+
+;; (defn home-page [r] (ring-resp/response "ajdnsakjnd"))
+;; (def home-page (fn [r] (ring-resp/response "aj")))
 
 ;; Defines "/" and "/about" routes with their associated :get handlers.
 ;; The interceptors defined after the verb map (e.g., {:get home-page}
@@ -29,20 +32,21 @@
 (def common-interceptors [(body-params/body-params) http/html-body])
 
 ;; Tabular routes
-;; (def routes
-;;   #{["/" :get (conj common-interceptors `home-page)]
-;;     ["/about" :get (conj common-interceptors `about-page)]})
+(def routes
+  #{["/" :get (conj common-interceptors `about-page)]
+    ["/about" :get (conj common-interceptors (fn [r] (ring-resp/response "oooooooooooooooo"))) :route-name :flamenko]})
+
 
 ;; Map-based routes
-;(def routes `{"/" {:interceptors [(body-params/body-params) http/html-body]
-;                   :get home-page
-;                   "/about" {:get about-page}}})
+;; (def routes `{"/" {:interceptors [(body-params/body-params) http/html-body]
+;;                   :get home-page}
+;;               "/about" {:get about-page}})
 
 ;; Terse/Vector-based routes
-(def routes
- `[[["/" {:get home-page}
-     ^:interceptors [(body-params/body-params) http/html-body]
-     ["/about" {:get about-page}]]]])
+;; (def routes
+;;  `[[["/" {:get home-page}
+;;      ^:interceptors [(body-params/body-params) http/html-body]
+;;      ["/about" {:get about-page}]]]])
 
 
 ;; Consumed by wolth.server/create-server

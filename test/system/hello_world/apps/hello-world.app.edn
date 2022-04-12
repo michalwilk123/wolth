@@ -1,9 +1,9 @@
-{:meta {:author "Michał Wilk",
-        :created-at nil,
-        :services nil,
-        :shortname "hello",
-        :updated-at nil,
-        :version nil},
- :objects
-   [{:data {:hello "world"}, :driver "map-object", :url-name "hello-world"}
-    {:url-name "videos"}]}
+{:interceptors {
+                :all [:json]
+                :delete [:send-mail]
+                :custom [:test-intercep :another]},
+ :meta {:author "Michał Wilk", :shortname "hello", :version nil},
+ :objects [ {:default-data {:hello "world"},
+            :url-name "hello-world"
+            :join-with []}
+           {:url-name "videos" :name "FILMY" :additional-interceptors [:custom]} ]}

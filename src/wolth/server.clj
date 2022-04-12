@@ -2,6 +2,7 @@
   (:gen-class) ; for -main method in uberjar
   (:require [io.pedestal.http :as server]
             [io.pedestal.http.route :as route]
+            [wolth.utils.file-utils :as file-utils]
             [wolth.service :as service]))
 
 ;; This is an adapted service map, that can be started and stopped
@@ -38,11 +39,18 @@
 
 (defn generate-routes-from-config [filename] nil)
 
-;; (defn )
+
+(def test-path "test/system/hello_world/apps/hello-world.app.edn")
+
+;; (defn hhh [x] (-> x #(+ % 3) #(* % 22)))
+(defn hhh [x] (->> x (partial + 3) (partial * 22)))
+;; (defn hhh [x] (+ 3 (* 22 x)))
+(hhh 12)
 
 (comment
-  (nazwa 12)
-  ( run-dev ))
+  (file-utils/routes-object-for-single-application test-path)
+  ( run-dev )
+  (slurp "test/system/hello_world/apps/hello-world.app.edn"))
 
 ;; If you package the service up as a WAR,
 ;; some form of the following function sections is required (for io.pedestal.servlet.ClojureVarServlet).
