@@ -1,9 +1,10 @@
 (ns wolth.service
-  (:require [io.pedestal.http :as http]
-            [io.pedestal.http.route :as route]
+  (:require [clojure.data.json :as json]
+            [io.pedestal.http :as http]
             [io.pedestal.http.body-params :as body-params]
+            [io.pedestal.http.route :as route]
             [ring.util.response :as ring-resp]
-            [clojure.data.json :as json]))
+            [wolth.utils.file-utils :as file-utils]))
 
 
 (def ex-interceptor
@@ -11,11 +12,11 @@
    :leave (fn [context]
             (assoc context
               :headers {"Content-Type" "application/json"}
-              :response (json/write-str (get-in [:response :body]))))})
+              :response (json/write-str (get-in [:response :body] {}))))})
 
 (defn about-page
   [request]
-  (ring-resp/response (format "Clojure %s - served from %s"
+  (ring-resp/response (format "Clojure %s - kjkdsnakdksa %s"
                               (clojure-version)
                               (route/url-for ::about-page))))
 
@@ -34,7 +35,12 @@
 ;; Tabular routes
 (def routes
   #{["/" :get (conj common-interceptors `about-page)]
-    ["/about" :get (conj common-interceptors (fn [r] (ring-resp/response "oooooooooooooooo"))) :route-name :flamenko]})
+    ["/about" :get (conj common-interceptors (fn [r] (ring-resp/response "oooooooooooooo"))) :route-name :flamenko]})
+
+(def test-path "test/system/hello_world/apps/hello-world.app.edn")
+
+(def routes-v2 (file-utils/routes-object-for-single-application test-path))
+
 
 
 ;; Map-based routes

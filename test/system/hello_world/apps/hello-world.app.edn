@@ -10,4 +10,4 @@
    [{:default-data {:data {:hello "world"}, :headers nil, :status 200},
      :join-with [],
      :url-name "hello-world"}
-    {:additional-interceptors [:custom], :name "FILMY", :url-name "videos"}]}
+    {:additional-interceptors [:custom], :default-data {:data {:endpoint "Nie znaleziono"} :headers nil :status 404}, :name "FILMY", :url-name "videos"}]}

@@ -11,6 +11,7 @@
 
 (def test-path "test/system/hello_world/apps/hello-world.app.edn")
 
+
 (defn run-dev
   "The entry-point for 'lein run-dev'"
   [& args]
@@ -22,10 +23,8 @@
             ::server/join? false,
             ;; Routes can be a function that resolve routes,
             ;;  we can use this to set the routes to be reloadable
-            ;; ::server/routes #(route/expand-routes (deref #'service/routes)),
-            ::server/routes #(route/expand-routes
-                                (file-utils/routes-object-for-single-application
-                                  test-path)),
+            ::server/routes #(route/expand-routes (deref #'service/routes-v2)),
+            ;; ::server/routes #(route/expand-routes service/routes),
             ;; all origins are allowed in dev mode
             ::server/allowed-origins {:creds true,
                                       :allowed-origins (constantly true)},
@@ -45,24 +44,13 @@
   (server/start runnable-service))
 
 
-(defn generate-routes-from-config [filename] nil)
-
-
-
-;; (defn hhh [x] (-> x #(+ % 3) #(* % 22)))
-(defn hhh
-  [x]
-  (->> x
-       (partial + 3)
-       (partial * 22)))
-;; (defn hhh [x] (+ 3 (* 22 x)))
-(hhh 12)
-
 (comment
   (file-utils/routes-object-for-single-application test-path)
-         (run-dev)
-         (server/stop service/service)
-         (slurp "test/system/hello_world/apps/hello-world.app.edn"))
+  (run-dev)
+  (println "siemano kolano")
+  (server/start runnable-service)
+  (server/stop runnable-service)
+  (slurp "test/system/hello_world/apps/hello-world.app.edn"))
 
 ;; If you package the service up as a WAR,
 ;; some form of the following function sections is required (for
