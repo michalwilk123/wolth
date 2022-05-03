@@ -1,13 +1,16 @@
 
-{:interceptors {:all {:json, nil},
+{:interceptors {:all {:json nil},
                 :custom {:another nil, :test-intercep nil},
                 :delete {:another [1 2 3 4]}},
  :meta {:author "Borys Backendowy", :shortname "hello", :version nil},
  :modules {"test/system/hello_world/apps/testing-module.clj"
-             {:test-intercep dummy-wolth-module/test-inter
-              :another dummy-wolth-module/test-inter-w-args}},
- :objects
-   [{:default-data {:data {:hello "world"}, :headers nil, :status 200},
-     :join-with [],
-     :url-name "hello-world"}
-    {:additional-interceptors [:custom], :default-data {:data {:endpoint "Nie znaleziono"} :headers nil :status 404}, :name "FILMY", :url-name "videos"}]}
+             {:another dummy-wolth-module/test-inter-w-args,
+              :test-intercep dummy-wolth-module/test-inter}},
+ :objects [{:default-data {:data {:hello "world"}, :headers nil, :status 200},
+            :join-with [],
+            :url-name "hello-world"}
+           {:additional-interceptors [:custom],
+            :default-data
+              {:data {:endpoint "Nie znaleziono"}, :headers nil, :status 404},
+            :name "FILMY",
+            :url-name "videos"}]}

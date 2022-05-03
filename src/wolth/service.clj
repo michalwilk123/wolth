@@ -20,9 +20,7 @@
                               (clojure-version)
                               (route/url-for ::about-page))))
 
-(defn home-page
-  [request]
-  (ring-resp/response "oooooooooooooooo"))
+(defn home-page [request] (ring-resp/response "oooooooooooooooo"))
 
 ;; (defn home-page [r] (ring-resp/response "ajdnsakjnd"))
 ;; (def home-page (fn [r] (ring-resp/response "aj")))
@@ -35,7 +33,9 @@
 ;; Tabular routes
 (def routes
   #{["/" :get (conj common-interceptors `about-page)]
-    ["/about" :get (conj common-interceptors (fn [r] (ring-resp/response "oooooooooooooo"))) :route-name :flamenko]})
+    ["/about" :get
+     (conj common-interceptors (fn [r] (ring-resp/response "oooooooooooooo")))
+     :route-name :flamenko]})
 
 (def test-path "test/system/hello_world/apps/hello-world.app.edn")
 

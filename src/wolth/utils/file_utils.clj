@@ -28,7 +28,7 @@
   (let [int-symbol (or (get standard-interceptors (first intercep))
                        (get @user-modules (first intercep))
                        (throw (AssertionError.
-                               "I don't know what this interceptor is")))
+                                "I don't know what this interceptor is")))
         optional-args (second intercep)]
     (if (fn? int-symbol) (apply int-symbol optional-args) int-symbol)))
 
@@ -50,13 +50,14 @@
        ;;            (ex-info
        ;;              "The second arg of intercep map should be vector or
        ;;              nil")))))
-       ))
+  ))
 
 
 ;; this should be expanded to support more than just default response value
 (defn object-default-route
   [obj-intercep object]
-  (or (vector? obj-intercep) (throw (RuntimeException. "The obj-intercep should always be a VECTOR!")))
+  (or (vector? obj-intercep)
+      (throw (RuntimeException. "The obj-intercep should always be a VECTOR!")))
   (conj obj-intercep
         (fn default-resp [r] (ring-resp/response (object :default-data)))))
 
@@ -65,7 +66,8 @@
   [prepared-interceptors single-routes-map]
   [(str "/" (single-routes-map :url-name)) :any
    (object-default-route prepared-interceptors single-routes-map) :route-name
-   (keyword (or (single-routes-map :name) (single-routes-map :url-name) "undefined"))])
+   (keyword
+     (or (single-routes-map :name) (single-routes-map :url-name) "undefined"))])
 
 (defn routes-from-map
   [parsed-config]
@@ -73,11 +75,11 @@
         object-list (parsed-config :objects)]
     (set (concat (map (fn create-route [obj]
                         (routes-from-object
-                         (object-interceptors
-                          (cons :all (obj :additional-interceptors))
-                          interceptors)
-                         obj))
-                      object-list)))))
+                          (object-interceptors
+                            (cons :all (obj :additional-interceptors))
+                            interceptors)
+                          obj))
+                   object-list)))))
 
 
 (defn load-application-modules!
@@ -87,7 +89,7 @@
                       int-dict (second module-vec)]
                   (load-file mod-path)
                   (swap! user-modules merge int-dict)))
-              (get config :modules)))
+           (get config :modules)))
   config)
 
 (defn routes-object-for-single-application
