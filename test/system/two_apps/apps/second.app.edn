@@ -1,14 +1,3 @@
-{
-    :meta {
-        :shortname "sec"
-    }
-    :objects (
-        {
-            :url-name "second"
-            :driver "map-object"
-            :data {
-                :myObject "second"
-            }
-        }
-    )
-}
+{:meta {:shortname "sec"},
+ :objects
+   ({:data {:myObject "second"}, :driver "map-object", :url-name "second"})}

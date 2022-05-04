@@ -1,15 +1,2 @@
-{
-    :meta {
-        :shortname "sec"
-    }
-    :objects (
-        {
-            :name {
-            }
-            :driver "map-object"
-            :data {
-                :myObject "second"
-            }
-        }
-    )
-}
+{:meta {:shortname "sec"},
+ :objects ({:data {:myObject "second"}, :driver "map-object", :name {}})}

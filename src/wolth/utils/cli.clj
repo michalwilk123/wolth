@@ -8,7 +8,8 @@
 
 (def cli-build-options nil)
 
-(defn run-cli [& args]
+(defn run-cli
+  [& args]
   (let [{:keys [action options exit-message ok?]} (validate-args args)]))
 
 

@@ -38,9 +38,10 @@
       server/create-server
       server/start))
 
-(defn -main "The entry-point for 'lein run'" [& args] 
-  (if (seq? args) (cli/run-cli args) (cli/display-commands))
-  )
+(defn -main
+  "The entry-point for 'lein run'"
+  [& args]
+  (if (seq? args) (cli/run-cli args) (cli/display-commands)))
   ;;(server/start runnable-service))
 
 
