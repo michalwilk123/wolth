@@ -48,8 +48,9 @@
 (comment
   (file-utils/routes-object-for-single-application test-path)
   (run-dev)
-  (println "siemano kolano")
-  (-main "--first" "arg" "dsdsadsada")
+  (-main "run" "-A" "project.clj")
+  (println "hello world")
+  (-main "-P" "8000" "-A" "dsandsjkankda")
   (slurp "test/system/hello_world/apps/hello-world.app.edn"))
 
 ;; If you package the service up as a WAR,
