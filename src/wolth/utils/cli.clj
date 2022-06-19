@@ -32,19 +32,12 @@
    ["-d" "--[no-]daemon" "Daemonize the process" :default true]
    ["-h" "--help"]])
 
-;; (defn run-cli
-;;   [& args]
-;;   (let [{:keys [action options exit-message ok?]} (validate-args args)]))
-
-
 (defn usage
   [options-summary]
   (->>
-    ["This is my program. There are many like it, but this one is mine." ""
-     "Usage: program-name [options] action" "" "Options:" options-summary ""
-     "Actions:" "  start    Start a new server"
-     "  stop     Stop an existing server" "  status   Print a server's status"
-     "" "Please refer to the manual page for more information."]
+    ["This is my program. There are many like it, but this one is mine."
+     "Usage: program-name [options] action. Options:" options-summary
+     "Actions:"]
     (str/join \newline)))
 
 (defn error-msg
@@ -80,7 +73,8 @@
   (let [{:keys [action options exit-message ok?]} (validate-args args)]
     (if exit-message
       (exit (if ok? 0 1) exit-message)
-      (case action "run" (println "DZIALAM")))))
+      (case action "run" (println "DZIALAM" options)))))
 
-;;dsadsadsa
 (defn display-commands [] (println "dsdsa"))
+
+(defn create-server-config-from-cli-opts [opts] {})
