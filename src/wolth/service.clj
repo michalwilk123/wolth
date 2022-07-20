@@ -4,7 +4,7 @@
             [io.pedestal.http.body-params :as body-params]
             [io.pedestal.http.route :as route]
             [ring.util.response :as ring-resp]
-            [wolth.utils.file-utils :as file-utils]))
+            [wolth.utils.loader :as loader]))
 
 
 (def ex-interceptor
@@ -39,7 +39,7 @@
 
 (def test-path "test/system/hello_world/apps/hello-world.app.edn")
 
-(def routes-v2 (file-utils/routes-object-for-single-application test-path))
+(def routes-v2 (loader/create-routes-for-one-application test-path))
 
 
 

@@ -2,43 +2,35 @@
   (:require [clojure.tools.cli :refer [parse-opts]]
             [clojure.string :as str]
             [clojure.java.io :as io])
-  (:import (java.net InetAddress))
   (:gen-class))
+
+(def help-man-path "src/wolth/utils/help.txt")
+
+(defn show-help [] 
+  (print (slurp help-man-path)))
 
 (defn file-exists? [filename] (.exists (io/file filename)))
 
 (comment
-  (file-exists? "project.clj"))
+  (show-help)
+  (file-exists? "project.clj")
+  )
 
 ;; TODO: SHOULD CHECK IF APP FILES ARE ENDING WITH .app EXTENSION
 
 (def cli-run-options
-  [["-P" "--port" "Port number" :default 8000 :parse-fn #(Integer/parseInt %)
-    :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
-   ["-H" "--hostname HOST" "Remote host" :default
-    (InetAddress/getByName "localhost") :default-desc "localhost" :parse-fn
-    #(InetAddress/getByName %)]
-   ["-D" "--detach" "Detach from controlling process"]
-   ["-v" "--verbosity"
-    "Verbosity level; may be specified multiple times to increase value"
-    :default "WARNING"]
-   ["-A" "--applications"
+  [["-A" "--applications"
     "List of applications that will be hosted on the platform" :required true
     :multi true :update-fn conj :validate [file-exists?]]
    ["-M" "--modules" "Additional packages to add" :multi true :validate-fn
-    file-exists?]
-   [nil "--dry-run" "Output generated server code" :default false]
-   ;;  A boolean option that can explicitly be set to false
-   ["-d" "--[no-]daemon" "Daemonize the process" :default true]
-   ["-h" "--help"]])
+    file-exists?]])
 
 (defn usage
   [options-summary]
-  (->>
-    ["This is my program. There are many like it, but this one is mine."
-     "Usage: program-name [options] action. Options:" options-summary
-     "Actions:"]
-    (str/join \newline)))
+  (->> ["This is my program. There are many like it, but this one is mine."
+        "Usage: program-name [options] action. Options:" options-summary
+        "Actions:"]
+       (str/join \newline)))
 
 (defn error-msg
   [errors]
@@ -73,7 +65,10 @@
   (let [{:keys [action options exit-message ok?]} (validate-args args)]
     (if exit-message
       (exit (if ok? 0 1) exit-message)
-      (case action "run" (println "DZIALAM" options)))))
+      (case action
+        "run" (println "DZIALAM" options)
+        "dry-run" (println options)
+        "help" (println "pomocna wiadomość")))))
 
 (defn display-commands [] (println "dsdsa"))
 

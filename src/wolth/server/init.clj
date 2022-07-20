@@ -1,17 +1,17 @@
-(ns wolth.server.start
+(ns wolth.server.init
   (:gen-class)
   (:require [io.pedestal.http.body-params :as body-params]
             [io.pedestal.http.route :as route]
             [io.pedestal.http :as http]
-            [ring.util.response :as ring-resp]
-            ))
+            [ring.util.response :as ring-resp]))
 
 (def common-interceptors [(body-params/body-params) http/json-body])
 
 (def base-empty-route
   #{["/" :get
      (conj common-interceptors
-           (fn [r] (ring-resp/response {:hello "hello this is base page of wolth"})))
+           (fn [r]
+             (ring-resp/response {:hello "hello this is base page of wolth"})))
      :route-name :base-wolh-route]})
 
 (def base-server-config

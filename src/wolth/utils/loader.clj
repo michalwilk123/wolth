@@ -1,4 +1,4 @@
-(ns wolth.utils.file-utils
+(ns wolth.utils.loader
   (:require clojure.edn
             [io.pedestal.http :as http]
             [ring.util.response :as ring-resp]))
@@ -92,10 +92,13 @@
            (get config :modules)))
   config)
 
-(defn routes-object-for-single-application
+(defn create-routes-for-one-application
   [filepath]
   (-> filepath
       (app-file-content)
       (parsed-app-configuration)
       (load-application-modules!)
       (routes-from-map)))
+
+(defn create-routes [app-paths modules-paths]
+  )
