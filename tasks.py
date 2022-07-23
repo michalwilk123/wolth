@@ -4,13 +4,17 @@ from invoke import UnexpectedExit, task
 import pathlib
 import shlex
 import asyncio
+from typing import List
 
 
 async def run_unit_tests(ctx):
     print("Running unit tests")
 
-async def run_sys_tests(ctx):
-    print("Running system tests")
+async def run_sys_tests(ctx, paths:str=""):
+    # TODO: ADD OPTION TO NOT BUILD SERVER FROM SCRATCH
+    ctx.run("lein run &> /dev/null")
+    ctx.run(shlex.join(["pytest", paths]))
+    
 
 @task
 def check_for_zprint(c):
@@ -42,13 +46,17 @@ def lint(c, no_write=False):
     cmd = ["zprint", flags] + fpaths
     c.run(shlex.join(cmd))
 
-
 @task
-def test(c, unit=False, system=False):
+def utest(c):
+    ...
+
+@task(iterable=["apps"])
+def stest(c, apps, unit=False, system=False):
     """
     Running tests
     """
     tasks = []
+    print(f"{apps=}")
 
     if unit:
         tasks.append(run_unit_tests(c))
