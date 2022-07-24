@@ -6,15 +6,13 @@
 
 (def help-man-path "src/wolth/utils/help.txt")
 
-(defn show-help [] 
-  (print (slurp help-man-path)))
+(defn show-help [] (print "this is a help message"))
 
 (defn file-exists? [filename] (.exists (io/file filename)))
 
 (comment
   (show-help)
-  (file-exists? "project.clj")
-  )
+  (file-exists? "project.clj"))
 
 ;; TODO: SHOULD CHECK IF APP FILES ARE ENDING WITH .app EXTENSION
 
@@ -50,8 +48,7 @@
       errors ; errors => exit with description of errors
         {:exit-message (error-msg errors)}
       ;; custom validation on arguments
-      (and (= 1 (count arguments)) (#{"run"} (first arguments)))
-        {:action (first arguments), :options options}
+      (= 1 (count arguments)) {:action (first arguments), :options options}
       :else ; failed custom validation => exit with usage summary
         {:exit-message (usage summary)})))
 
@@ -60,15 +57,15 @@
 ;; (defn exit [status msg] (println msg) (System/exit status))
 (defn exit [status msg] (println msg) (println status))
 
-(defn run-cli
-  [args]
-  (let [{:keys [action options exit-message ok?]} (validate-args args)]
-    (if exit-message
-      (exit (if ok? 0 1) exit-message)
-      (case action
-        "run" (println "DZIALAM" options)
-        "dry-run" (println options)
-        "help" (println "pomocna wiadomość")))))
+;; (defn run-cli
+;;   [args]
+;;   (let [{:keys [action options exit-message ok?]} (validate-args args)]
+;;     (if exit-message
+;;       (exit (if ok? 0 1) exit-message)
+;;       (case action
+;;         "run" (println "DZIALAM" options)
+;;         "dry-run" (println options)
+;;         "help" (println "pomocna wiadomość")))))
 
 (defn display-commands [] (println "dsdsa"))
 

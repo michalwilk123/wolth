@@ -100,5 +100,4 @@
       (load-application-modules!)
       (routes-from-map)))
 
-(defn create-routes [app-paths modules-paths]
-  )
+(defn load-everything [app-paths modules-paths] "DKSNAKDSKJKDJASN")

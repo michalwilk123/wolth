@@ -4,7 +4,6 @@ from invoke import UnexpectedExit, task
 import pathlib
 import shlex
 import asyncio
-from typing import List
 
 
 async def run_unit_tests(ctx):
