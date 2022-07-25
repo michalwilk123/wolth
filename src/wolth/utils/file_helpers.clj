@@ -1,5 +1,19 @@
-(ns wolth.generator
+(ns wolth.utils.file-helpers
   (:require [clojure.string :as str]))
+
+
+(defn get-app-file-content
+  [filepath]
+  (try (slurp filepath)
+       (catch java.io.FileNotFoundException ex
+         (.printStackTrace ex)
+         (str "I could not file your app configuration" (.getMessage ex)))))
+
+
+; gives from string either map or nil if the format is incorrenct
+(defn parsed-app-configuration
+  [file-content]
+  (clojure.edn/read-string file-content))
 
 (def ignore-app-name-preffix "__")
 
@@ -20,8 +34,8 @@
 (defn create-routes-from-fpaths
   [filepaths]
   (-> filepaths
-      (flatten-nested-routes)
-      ()))
+      ;; (flatten-nested-routes)
+      ))
 
 (comment
   (-> "dsadas dsa dsa d sa"
