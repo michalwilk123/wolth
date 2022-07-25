@@ -3,7 +3,7 @@
                 :custom {:another nil, :test-intercep nil},
                 :delete {:another [1 2 3 4]}},
  :meta {:author "Borys Backendowy", :shortname "hello", :version nil},
- :modules {"test/system/hello_world/apps/testing-module.clj"
+ :modules {"test/system/hello_world/testing-module.clj"
              {:another dummy-wolth-module/test-inter-w-args,
               :test-intercep dummy-wolth-module/test-inter}},
  :objects [{:default-data {:data {:hello "world"}, :headers nil, :status 200},
