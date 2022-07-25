@@ -1,25 +1,12 @@
 (ns wolth.utils.loader
   (:require clojure.edn
             [io.pedestal.http :as http]
+            [wolth.utils.file-helpers :as fh]
             [ring.util.response :as ring-resp]))
 
 
 
 (def user-modules (atom {}))
-
-(defn app-file-content
-  [filepath]
-  (try (slurp filepath)
-       (catch java.io.FileNotFoundException ex
-         (.printStackTrace ex)
-         (str "I could not file your app configuration" (.getMessage ex)))))
-
-
-; gives from string either map or nil if the format is incorrenct
-(defn parsed-app-configuration
-  [file-content]
-  (clojure.edn/read-string file-content))
-
 
 (def standard-interceptors {:json http/json-body, :html http/html-body})
 
@@ -82,6 +69,9 @@
                    object-list)))))
 
 
+;; TODO: musisz dodać tutaj opcje warunkowego dodawania modułów
+;; załóżmy że będzie więcej niż jedna aplikacja korzystająca z tego samego
+;; modułu
 (defn load-application-modules!
   [config]
   (doall (map (fn load-and-add-module [module-vec]
@@ -95,9 +85,15 @@
 (defn create-routes-for-one-application
   [filepath]
   (-> filepath
-      (app-file-content)
-      (parsed-app-configuration)
+      (fh/get-app-file-content)
+      (fh/parsed-app-configuration)
       (load-application-modules!)
       (routes-from-map)))
 
-(defn load-everything [app-paths modules-paths] "DKSNAKDSKJKDJASN")
+(defn merge-app-routes [routes]
+  (first routes))
+
+(defn load-everything [app-paths] 
+  (->> app-paths
+      (map create-routes-for-one-application)
+      (merge-app-routes)))

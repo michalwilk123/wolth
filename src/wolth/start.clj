@@ -3,6 +3,7 @@
   (:require [wolth.utils.cli :as cli]
             [io.pedestal.http.route :as route]
             [wolth.utils.loader :refer [load-everything]]
+            [io.pedestal.log :as log]
             [io.pedestal.http :as http]))
 
 (defn exit [status msg] (println msg) (println status))
@@ -38,8 +39,7 @@
   (let [{:keys [action options exit-message ok?]} (cli/validate-args args)]
     (if exit-message
       (exit (if ok? 0 1) exit-message)
-      (let [generated-server (load-everything (options :applications)
-                                              (options :modules))]
+      (let [generated-server (load-everything (options :applications))]
         (case action
           "help" (println "pomocna wiadomość")
           "run" (-> generated-server
@@ -48,9 +48,8 @@
           "dry-run" (println generated-server)
           (throw (RuntimeException. (format "Unknown command: %s" action))))))))
 
-      ;; 
-
-(def test-path "test/system/hello_world/apps/hello-world.app.edn")
+(def test-path "test/system/hello_world/_hello-world.app.edn")
+(def test-path-2 "test/system/two_apps/test.app")
 
 (defn -main
   "The entry point of lein run"
@@ -62,4 +61,7 @@
   ;;         "run" (println "DZIALAM" options)
   ;;         "dry-run" (println options)
   ;;         "help" (println "pomocna wiadomość"))
-  (-main "dry-run" "-A" test-path))
+  (log/error :hello "dasbdasbdasjhj")
+  (-main "run" "-A" test-path)
+  (-main "dry-run" "-A" test-path)
+  (-main "dry-run" "-A" test-path-2))
