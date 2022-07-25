@@ -19,9 +19,7 @@
 (def cli-run-options
   [["-A" "--applications"
     "List of applications that will be hosted on the platform" :required true
-    :multi true :update-fn conj :validate [file-exists?]]
-   ["-M" "--modules" "Additional packages to add" :multi true :validate-fn
-    file-exists?]])
+    :multi true :update-fn conj :validate [file-exists?]]])
 
 (defn usage
   [options-summary]
