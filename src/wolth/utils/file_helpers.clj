@@ -1,5 +1,5 @@
 (ns wolth.utils.file-helpers
-  (:require [clojure.string :as str]))
+  (:require clojure.edn [clojure.string :as str]))
 
 
 (defn get-app-file-content
@@ -36,6 +36,13 @@
   (-> filepaths
       ;; (flatten-nested-routes)
       ))
+
+(defn expand-single-app-path [app-path]
+  )
+
+(defn expand-app-paths [app-path])
+
+(defn validate-app-config [app-path] true)
 
 (comment
   (-> "dsadas dsa dsa d sa"

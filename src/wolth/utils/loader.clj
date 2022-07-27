@@ -1,6 +1,5 @@
 (ns wolth.utils.loader
-  (:require clojure.edn
-            [io.pedestal.http :as http]
+  (:require [io.pedestal.http :as http]
             [wolth.utils.file-helpers :as fh]
             [ring.util.response :as ring-resp]))
 
@@ -50,14 +49,14 @@
 
 
 (defn routes-from-object
-  [prepared-interceptors single-routes-map]
-  [(str "/" (single-routes-map :url-name)) :any
+  [prepared-interceptors single-routes-map prefix]
+  [(str prefix (single-routes-map :url-name)) :any
    (object-default-route prepared-interceptors single-routes-map) :route-name
    (keyword
      (or (single-routes-map :name) (single-routes-map :url-name) "undefined"))])
 
 (defn routes-from-map
-  [parsed-config]
+  [parsed-config prefix]
   (let [interceptors (parsed-config :interceptors)
         object-list (parsed-config :objects)]
     (set (concat (map (fn create-route [obj]
@@ -65,7 +64,9 @@
                           (object-interceptors
                             (cons :all (obj :additional-interceptors))
                             interceptors)
-                          obj))
+                          obj
+                          prefix
+                         ))
                    object-list)))))
 
 
@@ -84,16 +85,20 @@
 
 (defn create-routes-for-one-application
   [filepath]
-  (-> filepath
+  (let [prefix (filepath)]
+    (-> filepath
       (fh/get-app-file-content)
       (fh/parsed-app-configuration)
       (load-application-modules!)
-      (routes-from-map)))
+      (routes-from-map prefix)))
+  )
 
 (defn merge-app-routes [routes]
   (first routes))
 
-(defn load-everything [app-paths] 
+(defn load-everything [app-paths]
   (->> app-paths
-      (map create-routes-for-one-application)
-      (merge-app-routes)))
+       (map fh/expand-app-paths)
+       (filter fh/validate-app-config) ;; this is perfect place to put in Spec!!
+       (map create-routes-for-one-application)
+       (merge-app-routes)))
