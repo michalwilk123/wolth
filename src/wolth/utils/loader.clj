@@ -65,8 +65,7 @@
                             (cons :all (obj :additional-interceptors))
                             interceptors)
                           obj
-                          prefix
-                         ))
+                          prefix))
                    object-list)))))
 
 
@@ -85,20 +84,22 @@
 
 (defn create-routes-for-one-application
   [filepath]
-  (let [prefix (filepath)]
+  (let [prefix (fh/create-app-name-prefix filepath)]
     (-> filepath
-      (fh/get-app-file-content)
-      (fh/parsed-app-configuration)
-      (load-application-modules!)
-      (routes-from-map prefix)))
-  )
+        (fh/get-app-file-content)
+        (fh/parsed-app-configuration)
+        (load-application-modules!)
+        (routes-from-map prefix))))
 
-(defn merge-app-routes [routes]
-  (first routes))
+(defn merge-app-routes [routes] (first routes))
 
-(defn load-everything [app-paths]
+(defn load-everything
+  [app-paths]
+  (println app-paths)
   (->> app-paths
-       (map fh/expand-app-paths)
+       (fh/expand-app-paths)
        (filter fh/validate-app-config) ;; this is perfect place to put in Spec!!
+       (map #(.getPath %))
        (map create-routes-for-one-application)
-       (merge-app-routes)))
+       ;;  (merge-app-routes)
+  ))

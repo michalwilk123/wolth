@@ -1,5 +1,7 @@
 (ns wolth.utils.file-helpers
-  (:require clojure.edn [clojure.string :as str]))
+  (:require clojure.edn
+            [clojure.string :as str]
+            [clojure.java.io :as io]))
 
 
 (defn get-app-file-content
@@ -15,7 +17,7 @@
   [file-content]
   (clojure.edn/read-string file-content))
 
-(def ignore-app-name-preffix "__")
+(def ignore-app-name-preffix "_")
 
 (defn get-name-from-filepath
   [filepath]
@@ -24,10 +26,39 @@
       (last)
       (str/replace #"\.app\.(edn)?" "")))
 
+(defn file-obj-app?
+  [f]
+  ((every-pred #(.exists %)
+               (complement #(.isDirectory %))
+               #(re-find #"\.app\.(edn)?$" (.getName %)))
+    f))
+
+(comment
+  (file-obj-app? (clojure.java.io/file "dsajdjkasbds"))
+  (file-obj-app? (clojure.java.io/file
+                   "test/system/hello_world/_hello-world.app.edn"))
+  (file-obj-app? (clojure.java.io/file "test/system/two_apps/test.app")))
+
 (defn create-app-name-prefix
   [filepath]
-  (let [app-name (get-name-from-filepath filepath)]
-    (if (str/starts-with? app-name ignore-app-name-preffix) "" app-name)))
+  (assert (string? filepath))
+  (->> filepath
+       ((fn split-fname [fpath]
+          (str/split fpath (re-pattern (java.io.File/separator)))))
+       (filter #(re-find #"\.app(\.edn)?$" %))
+       (filter #((complement str/starts-with?) % ignore-app-name-preffix))
+       (map #(str/replace % #"\.app(\.edn)?" ""))
+       (str/join (str java.io.File/separator))
+       (str "/")))
+
+
+(comment
+  (create-app-name-prefix "test/system/hello_world/_hello-world.app.edn")
+  (create-app-name-prefix "test/system/two_apps/test.app/second.app.edn")
+  (create-app-name-prefix "test/system/two_apps/test.app/first.app.edn")
+  ;; ((fn filter-fnames [fname] ( filter #(re-find #"\.app\.(edn)?$" (.getName
+  ;; %)) fname)  )))
+)
 
 (defn flatten-nested-routes [filepaths] nil)
 
@@ -35,12 +66,32 @@
   [filepaths]
   (-> filepaths
       ;; (flatten-nested-routes)
-      ))
+  ))
 
-(defn expand-single-app-path [app-path]
-  )
+(defn expand-single-app-path
+  [app-path]
+  (let [file-obj (clojure.java.io/file app-path)]
+    (cond (not (.exists file-obj)) nil
+          (.isDirectory file-obj) (->> file-obj
+                                       (file-seq)
+                                       (filter file-obj-app?))
+          :else (list file-obj))))
 
-(defn expand-app-paths [app-path])
+(comment
+  (expand-single-app-path "dsajdjkasbds")
+  (expand-single-app-path "test/system/hello_world/_hello-world.app.edn")
+  (expand-single-app-path "test/system/two_apps/test.app"))
+
+(defn expand-app-paths
+  [app-paths]
+  (->> app-paths
+       (map expand-single-app-path)
+       (apply concat)))
+
+(comment
+  (expand-app-paths '("dsajdjkasbds"
+                      "test/system/hello_world/_hello-world.app.edn"
+                      "test/system/two_apps/test.app")))
 
 (defn validate-app-config [app-path] true)
 
