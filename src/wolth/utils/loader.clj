@@ -47,6 +47,9 @@
   (conj obj-intercep
         (fn default-resp [r] (ring-resp/response (object :default-data)))))
 
+(comment
+  (ring-resp/response {:hello "world"})
+  )
 
 (defn routes-from-object
   [prepared-interceptors single-routes-map prefix]
@@ -57,6 +60,7 @@
 
 (defn routes-from-map
   [parsed-config prefix]
+  (println (str "PARSED" parsed-config ))
   (let [interceptors (parsed-config :interceptors)
         object-list (parsed-config :objects)]
     (set (concat (map (fn create-route [obj]
@@ -95,7 +99,6 @@
 
 (defn load-everything
   [app-paths]
-  (println app-paths)
   (->> app-paths
        (fh/expand-app-paths)
        (filter fh/validate-app-config) ;; this is perfect place to put in Spec!!

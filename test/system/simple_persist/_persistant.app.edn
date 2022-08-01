@@ -1,0 +1,11 @@
+{:interceptors {:all {:json nil},
+                :custom {:another nil, :test-intercep nil},
+                :delete {:another [1 2 3 4]}},
+ :objects [{:name "person"
+            :join-with []
+            :fields [
+                ""
+            ]
+            }
+           ]}
+
