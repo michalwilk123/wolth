@@ -32,12 +32,12 @@
   ((every-pred #(.exists %)
                (complement #(.isDirectory %))
                #(re-find #"\.app\.(edn)?$" (.getName %)))
-   f))
+    f))
 
 (comment
   (file-obj-app? (clojure.java.io/file "dsajdjkasbds"))
   (file-obj-app? (clojure.java.io/file
-                  "test/system/hello_world/_hello-world.app.edn"))
+                   "test/system/hello_world/_hello-world.app.edn"))
   (file-obj-app? (clojure.java.io/file "test/system/two_apps/test.app")))
 
 ; create from filepath prefix to the route object
@@ -47,11 +47,14 @@
   (->> filepath
        ((fn split-fname [fpath]
           (str/split fpath (re-pattern (java.io.File/separator)))))
-       (filter #(re-find #"\.app(\.edn)?$" %)) ; filter out only files with correct extension
-       (remove #(str/starts-with? % ignore-app-name-preffix)) ; remove ignored names
+       (filter #(re-find #"\.app(\.edn)?$" %)) ; filter out only files with
+                                               ; correct extension
+       (remove #(str/starts-with? % ignore-app-name-preffix)) ; remove ignored
+                                                              ; names
        (map #(str/replace % #"\.app(\.edn)?" "")) ; remove file extensions
        (str/join "/") ; join all names with a slash
-       (str "/"))) ; prepend name with slash
+       ((fn surround-with-slashes [names]
+          (if (str/blank? names) "/" (str "/" names "/")))))) ; prepend name with slash
 
 
 (comment
@@ -60,7 +63,7 @@
   (create-app-name-prefix "test/system/two_apps/test.app/first.app.edn")
   ;; ((fn filter-fnames [fname] ( filter #(re-find #"\.app\.(edn)?$" (.getName
   ;; %)) fname)  )))
-  )
+)
 
 (defn flatten-nested-routes [filepaths] nil)
 
@@ -68,7 +71,7 @@
   [filepaths]
   (-> filepaths
       ;; (flatten-nested-routes)
-      ))
+  ))
 
 (defn expand-single-app-path
   [app-path]
