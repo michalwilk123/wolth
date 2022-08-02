@@ -1,6 +1,5 @@
 {:interceptors {:all {:json nil},
                 :custom {:another nil, :test-intercep nil},
                 :delete {:another [1 2 3 4]}},
- :objects
-   [{:fields [""], :join-with [], :name "person"}]}
+ :objects [{:fields [""], :join-with [], :name "person"}]}
 
