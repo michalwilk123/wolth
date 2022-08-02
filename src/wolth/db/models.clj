@@ -3,13 +3,11 @@
             [next.jdbc :as jdbc]
             [honey.sql.helpers :as hsql]))
 
-(def db {:dbtype "h2" :dbname "example"})
+(def db {:dbtype "h2", :dbname "example"})
 
 (def ds (jdbc/get-datasource db))
 
-(def sqlmap {:select [:a :b :c]
-             :from   [:foo]
-             :where  [:= :foo.a "baz"]})
+(def sqlmap {:select [:a :b :c], :from [:foo], :where [:= :foo.a "baz"]})
 
 ;; (jdbc/execute! ds ["
 ;; create table address (
@@ -21,5 +19,4 @@
 
 (comment
   (sql/format sqlmap)
-  (hsql/create-table :if-not-exists {})
-  )
+  (hsql/create-table :if-not-exists {}))
