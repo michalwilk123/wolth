@@ -41,7 +41,8 @@ build/
 .cpcache
 __pycache__
 
-.clj-kondo
+.clj-kondo/*
+!.clj-kondo/config.edn
 .lsp
 
 *.calva-repl
