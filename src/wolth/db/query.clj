@@ -3,6 +3,7 @@
             clojure.walk
             [honey.sql.helpers :as h]))
 
+
 (def open-bracket "(")
 (def close-bracket ")")
 
@@ -36,29 +37,12 @@
 
 (def objects-url-spec (atom {}))
 
-;; (def tt
-;;   (-> (h/select :*)
-;;       (h/from :foo)
-;;       (h/where [:< :expired_at [:raw ["now() - '" 5 " seconds'"]]])
-;;       (sql/format)))
-
 ; Available operations:
 ; - sort "<<" ">>"
 ; - filter - znaki: "==" "<>" ">" ">=" "LEN".
 ;    Połączone za pomocą
 ; - * (all)
 ; - detail - zwykły znak "="
-
-;; (def)
-
-;; (defn re-concat
-;;   [& patterns]
-;;   (->> patterns
-;;        (apply str)
-;;        (re-pattern)))
-
-;; (comment
-;;   (re-concat #"[0-9]" #"[a-z]" #"dsadsa$"))
 
 (defmacro def-token
   [name & exprs]
@@ -131,28 +115,6 @@
 (comment
   (parse-tokens-from-text "username=Michal" detailToken :fieldToken :valueToken)
   (parse-tokens-from-text "<<name" sortToken :fieldToken :sortDirToken))
-
-;; (def filterQueryCandidateRe
-;;   (re-pattern
-;;     (str "(?:\\(|^)"
-;;          (format "(%s)+"
-;;                  (str/join #"|" [ filterDelimiterToken filterOperatorToken
-;;                             valueToken fieldToken]) ; TODO TUTAJ!!
-;;          )
-;;          "(?:\\)|$)")))
-
-;; (def-token filterExprToken #"(?:^\()" #"[a-zA-Z0-9$()=<>]+" #"(?:\)$)")
-;; (def filterQueryCandidateRe #"(?<=\(?)[a-zA-Z0-9$()=<>]+(?=\)?)")
-
-
-;; (defn parse-filter-expr
-;;   [expr]
-;;   (assert (and (seq? expr) (not-empty expr)))
-;;   (let [lookahead-token (first expr)]
-;;     (case lookahead-token
-;;       "(" (do (assert (= (last expr) ")")) (recur (drop 1 (drop-last
-;;       expr)))))))
-
 
 
 (defn split-filter-query-into-chunks
@@ -365,10 +327,11 @@
 
 
 (defn build-subquery
-  [table-name selector]
+  [initial-map table-name selector]
   (assert (and (string? table-name) (string? selector))
           "Both arguments must be a string!")
-  (cond-> {:select :*, :from (keyword table-name)}
+  (assert map? initial-map)
+  (cond-> initial-map
     (token-found? detailToken selector :exact) (merge (detail-builder table-name
                                                                       selector))
     (token-found? allToken selector :exact) (identity)
@@ -380,13 +343,25 @@
       (merge (sort-builder table-name selector)
              (filter-builder table-name selector))))
 
+
+(defn build-select
+  [table-name selector]
+  (build-subquery {:select :*, :from (keyword table-name)} table-name selector))
+
 (comment
-  (build-subquery "person" "id=111")
-  (build-subquery "person" "<<name>>age")
-  (build-subquery "person" "<<name")
-  (build-subquery "person" "")
-  (build-subquery "person" "<<name(name<>admin)")
-  (build-subquery "person" "name==Adam$and$age>10"))
+  (build-select "person" "id=111")
+  (build-select "person" "<<name>>age")
+  (build-select "person" "<<name")
+  (build-select "person" "")
+  (build-select "person" "<<name(name<>admin)")
+  (build-select "person" "name==Adam$and$age>10"))
+
+(defn build-delete
+  [table-name selector]
+  (build-subquery {:delete :*, :from (keyword table-name)} table-name selector))
+
+(comment
+  (build-delete "person" "id=111"))
 
 (defn merge-sql-subqueries [subqueries] "MERGED")
 
@@ -399,8 +374,10 @@
        (create-pairs)
        (check-if-joining-valid)
        (map (partial apply build-subquery))
-       (merge-sql-subqueries)))
+      ;;  (merge-sql-subqueries)
+       ))
 
 
 (comment
   (build-query-from-url "/person/id=111/"))
+
