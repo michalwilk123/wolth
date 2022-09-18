@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [io.pedestal.test :refer [response-for]]
             [io.pedestal.http :as bootstrap]
-            [wolth.service :as service]))
+            [wolth.-service :as service]))
 
 (def service
   (::bootstrap/service-fn (bootstrap/create-servlet service/service)))

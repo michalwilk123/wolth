@@ -1,0 +1,15 @@
+{:interceptors {:all {:json nil},
+                :custom {:another nil, :test-intercep nil},
+                :delete {:another [1 2 3 4]}},
+ :objects [{:fields [{:constaints [:not-null], :name "name", :type :str32}
+                     {:name "note", :type :text}],
+            :name "Person",
+            :options [:uuid-identifier]}
+           {:fields [{:name "content", :type :text}],
+            :name "Post",
+            :options [:uuid-identifier],
+            :relations [{:name "author",
+                         :ref-type :o2m,
+                         :references "Person",
+                         :related-name "posts",
+                         :type :uuid}]}]}

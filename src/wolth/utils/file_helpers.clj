@@ -85,6 +85,7 @@
 (comment
   (expand-single-app-path "dsajdjkasbds")
   (expand-single-app-path "test/system/hello_world/_hello-world.app.edn")
+  (expand-single-app-path "test/system/person/_person.app.edn")
   (expand-single-app-path "test/system/two_apps/test.app"))
 
 (defn expand-app-paths

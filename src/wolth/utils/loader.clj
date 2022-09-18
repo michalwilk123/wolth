@@ -5,7 +5,7 @@
 
 
 
-(def user-modules (atom {}))
+(defonce user-modules (atom {}))
 
 (def standard-interceptors {:json http/json-body, :html http/html-body})
 
@@ -96,12 +96,59 @@
 
 (defn merge-app-routes [routes] (first routes))
 
+(defn load-single-app-file
+  [path]
+  (-> path
+      (fh/get-app-file-content)
+      (fh/parsed-app-configuration)))
+
+(defn load-single-mod
+  [path mod-map & [cache]]
+  (load-file path)
+  (for [value mod-map]
+    (or (and cache (@user-modules (first value)))
+        (swap! user-modules (fn [current mod] (apply assoc current mod))
+          value))))
+
+
+(comment
+  (load-single-mod "test/system/hello_world/testing-module.clj"
+                   '{:another dummy-wolth-module/test-inter-w-args,
+                     :test-intercep dummy-wolth-module/test-inter}
+                   :cache)
+  (load-single-mod "test/system/hello_world/testing-module.clj"
+                   '{:another dummy-wolth-module/test-inter-w-args,
+                     :test-intercep dummy-wolth-module/test-inter}))
+
+(defn load-single-app-mods
+  [app-content]
+  (as-> app-content it
+    (get it :modules)
+    (for [elem it] (apply load-single-mod (conj elem :cache)))))
+
+(comment
+  (load-single-app-mods
+    '{:modules {"test/system/hello_world/testing-module.clj"
+                  {:another dummy-wolth-module/test-inter-w-args,
+                   :test-intercep dummy-wolth-module/test-inter}}}))
+
 (defn load-everything
   [app-paths]
   (->> app-paths
        (fh/expand-app-paths)
-       (filter fh/validate-app-config) ;; this is perfect place to put in Spec!!
        (map #(.getPath %))
-       (map create-routes-for-one-application)
-       ;;  (merge-app-routes)
+       ;;  (map create-routes-for-one-application)
   ))
+
+
+(defn load-files-and-modules
+  [app-paths]
+  (let [app-content (->> app-paths
+                         (fh/expand-app-paths)
+                         (map #(.getPath %))
+                         (map load-single-app-file))]
+    (doall (map identity app-content))
+    app-content))
+
+(comment
+  (load-files-and-modules '("test/system/person/_person.app.edn")))
