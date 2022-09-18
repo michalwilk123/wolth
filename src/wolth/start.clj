@@ -1,67 +1,48 @@
-(ns wolth.start
-  (:gen-class)
-  (:require [wolth.utils.cli :as cli]
+(ns start                               ;; <1>
+  (:require [io.pedestal.http :as http] ;; <2>
             [io.pedestal.http.route :as route]
-            [wolth.utils.loader :refer [load-everything]]
-            [io.pedestal.log :as log]
-            [io.pedestal.http :as http]))
+            [wolth.server.routes :as r])) ;; <3>
 
-(defn exit [status msg] (println msg) (println status))
+(defn respond-hello
+  [request]          ;; <1>
+  {:status 200, :body "Hello, world!"}) ;; <2>
 
-(defn create-server-config
-  [routes]
+;; (def routes
+;;   (route/expand-routes                                   ;; <1>
+;;    #{["/greet" :get respond-hello :route-name :greet]})) ;; <2>
+
+
+
+(def initial
   {:env :dev,
    ;; do not block thread that starts web server
    ::http/join? false,
    ::http/type :jetty,
-   ::http/port 8001,
-   ::http/routes #(route/expand-routes routes),
-   ;; ::http/routes #(route/expand-routes (deref #'service/routes-v2)),
+   ::http/port 8002,
+   ::http/routes (fn [] (deref #'r/route-table)),
    ::http/resource-path "/public",
    ::http/container-options {:h2c? true, :h2? false, :ssl? false},
    ::http/allowed-origins {:creds true, :allowed-origins (constantly true)},
    ::http/secure-headers {:content-security-policy-settings {:object-src
                                                                "'none'"}}})
 
-(defn run-server
-  "The entry-point for 'lein run-dev'"
-  [server-config]
-  (println "\nCreating your [DEV] server...")
-  (-> server-config
-      http/default-interceptors
-      http/dev-interceptors
-      http/create-server
-      http/start))
+(def server-instance (atom initial))
 
+(defn create-server [] (swap! server-instance http/create-server))
 
-(defn run-application
-  [args]
-  (let [{:keys [action options exit-message ok?]} (cli/validate-args args)]
-    (if exit-message
-      (exit (if ok? 0 1) exit-message)
-      (let [generated-server (load-everything (options :applications))]
-        (case action
-          "help" (println "pomocna wiadomość")
-          "run" (-> generated-server
-                    (create-server-config)
-                    (run-server))
-          "dry-run" (println generated-server)
-          (throw (RuntimeException. (format "Unknown command: %s" action))))))))
+(defn start-server [] (http/start @server-instance))
 
-(def test-path "test/system/hello_world/_hello-world.app.edn")
-(def test-path-2 "test/system/two_apps/test.app")
+(defn stop-server [] (http/stop @server-instance))
 
-(defn -main
-  "The entry point of lein run"
-  [& args]
-  (if (seq? args) (run-application args) (cli/display-commands)))
 
 (comment
-  ;; (case action
-  ;;         "run" (println "DZIALAM" options)
-  ;;         "dry-run" (println options)
-  ;;         "help" (println "pomocna wiadomość"))
-  (log/error :hello "dasbdasbdasjhj")
-  (-main "run" "-A" test-path)
-  (-main "dry-run" "-A" test-path)
-  (-main "dry-run" "-A" test-path-2))
+  (create-server)
+  ;; (reset! server-instance)
+  (@server-instance)
+  (reset! server-instance initial)
+  (start-server)
+  (stop-server)
+  (route/expand-routes (deref #'r/route-table-v2))
+  (route/expand-routes r/route-table-v2)
+  (r/route-table-v2))
+

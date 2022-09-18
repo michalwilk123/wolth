@@ -7,6 +7,7 @@
             [wolth.utils.loader :as loader]))
 
 
+
 (def ex-interceptor
   {:name ::orzel,
    :leave (fn [context]
@@ -37,10 +38,12 @@
      (conj common-interceptors (fn [r] (ring-resp/response "oooooooooooooo")))
      :route-name :flamenko]})
 
-(def test-path "test/system/hello_world/apps/hello-world.app.edn")
+(def test-path "test/system/hello_world/_hello-world.app.edn")
 
 (def routes-v2 (loader/create-routes-for-one-application test-path))
 
+(comment
+  routes-v2)
 
 
 ;; Map-based routes
