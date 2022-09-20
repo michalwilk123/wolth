@@ -28,14 +28,14 @@
 
 (defn hello [req] {:status 200, :body (str "HNALDER!!" (req :path-params))})
 
-; IMPORTANT! Expand route must be outside the init function
+;; IMPORTANT! Expand route must be outside the init function
 (def route-table
   (route/expand-routes
-    [[:hello ["/hello-world" {:get 'hello-world} ["/:id" {:get hello}]]]]))
+    [[:hello ["/hello-world" {:get 'hello-world} ["/:id" {:get 'hello}]]]]))
 
 
 (comment
-  route-table)
+   route-table )
 
 (comment
   (sql/format (hsql/create-table :foo :if-not-exists)))
