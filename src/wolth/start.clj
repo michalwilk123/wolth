@@ -26,14 +26,13 @@
    ::http/secure-headers {:content-security-policy-settings {:object-src
                                                                "'none'"}}})
 
-(def server-instance (atom initial))
+(defonce server-instance (atom initial))
 
 (defn create-server [] (swap! server-instance http/create-server))
 
 (defn start-server [] (http/start @server-instance))
 
 (defn stop-server [] (http/stop @server-instance))
-
 
 (comment
   (create-server)
