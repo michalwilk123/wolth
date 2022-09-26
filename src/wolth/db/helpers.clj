@@ -6,6 +6,7 @@
    :str16 "VARCHAR(16)",
    :str32 "VARCHAR(32)",
    :str128 "VARCHAR(128)",
+   :str256 "VARCHAR(256)",
    :uuid "VARCHAR(32)",
    :bool "BOOLEAN",
    :text "TEXT",
@@ -21,24 +22,10 @@
    :identity "IDENTITY",
    :auto-increment "AUTO_INCREMENT"})
 
+; USE H2 is experimental feature (not implemented yet)
+(def available-table-options [:uuid-identifier :use-h2])
 
-(defn create-relationship-field-name [fieldset-1 fieldset-2] nil)
-
-(defn create-o2m-relation [] nil)
-
-(defn create-o2o-relation [] nil)
-
-(def relationship-map {:o2m create-o2m-relation, :o2o create-o2o-relation})
-
-(defn relationship?
-  [field-vec]
-  (assert (keyword? field-vec))
-  (contains? relationship-map field-vec))
-
-
-(comment
-  (relationship? :o2o)
-  (relationship? :abc))
+(def availiable-relationships [:o2m :o2o])
 
 (defn translate-keys-to-vals
   [keys src-map]
