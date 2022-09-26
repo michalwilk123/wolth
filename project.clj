@@ -20,7 +20,8 @@
      [com.github.seancorfield/honeysql "2.3.911"]
      [com.github.seancorfield/next.jdbc "1.2.796"]
      [org.clojure/spec.alpha "0.3.218"]
-     [org.clojure/data.json "2.4.0"]]
+     [cheshire "5.11.0"]
+     [cryptohash-clj "0.1.10"]]
   :min-lein-version "2.0.0"
   :resource-paths ["config" "resources"]
   ;; If you use HTTP/2 or ALPN, use the java-agent to pull in the correct
