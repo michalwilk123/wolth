@@ -1,4 +1,4 @@
-(ns wolth.db.helpers)
+(ns wolth.utils.common)
 
 (def field-lut
   {:char "VARCHAR(1)",
@@ -8,6 +8,7 @@
    :str128 "VARCHAR(128)",
    :str256 "VARCHAR(256)",
    :uuid "VARCHAR(32)",
+   :password "VARCHAR(128)",
    :bool "BOOLEAN",
    :text "TEXT",
    :int "INTEGER",
@@ -69,3 +70,21 @@
 (comment
   (compose 1 (partial + 3) str)
   (compose 1 (partial + 3) (partial * 2) (partial + -1)))
+
+(defn sift-keys-in-map
+  [in-map keys]
+  (into {} (filter #(vector-contains? keys (name (first %))) in-map)))
+
+(comment
+  (sift-keys-in-map {:aaa 123, :bbb 222} ["aaa" "bbb"])
+  (sift-keys-in-map {:aaa 123, :bbb 222} ["bbb"]))
+
+(defn assoc-vector
+  [in-map vec]
+  (reduce (fn [acc val] (assoc acc (keyword (first val)) (second val)))
+    in-map
+    vec))
+
+(comment
+  (assoc-vector {:aaa 123, :bbb 111} [["ccc" 333] ["bbb" 999]])
+  (assoc-vector {:aaa 123, :bbb 111} [["ccc" 333] ["ddd" 999]]))
