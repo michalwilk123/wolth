@@ -1,5 +1,6 @@
 (ns start                               ;; <1>
   (:require [io.pedestal.http :as http] ;; <2>
+            [wolth.utils.loader :as load]
             [io.pedestal.http.route :as route]
             [wolth.server.routes :as r])) ;; <3>
 
@@ -28,7 +29,11 @@
 
 (defonce server-instance (atom initial))
 
-(defn create-server [] (swap! server-instance http/create-server))
+(defn create-server
+  []
+  (doall
+    ;; (prepat)
+    (swap! server-instance http/create-server)))
 
 (defn start-server [] (http/start @server-instance))
 

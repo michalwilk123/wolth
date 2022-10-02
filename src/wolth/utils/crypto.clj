@@ -22,9 +22,8 @@
   [in-map]
   (assert (map? in-map) "Expecting clojure map as input!")
   (let [encoded-map (-> in-map
-                        (generate-string)
-                        (.getBytes))]
-    (.encodeToString (.withoutPadding (Base64/getUrlEncoder)) encoded-map)))
+                        (generate-string))]
+    (string->b64 encoded-map)))
 
 (comment
   (map->b64 {:user "name", :value "field"}))

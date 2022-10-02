@@ -98,7 +98,9 @@
   (re-seq filterQueryCandidateRe "dsadsa==1$or$ccc<=21")
   (token-found? filterQueryCandidateRe "name==john")
   (token-found? filterQueryCandidateRe "(name==john$and$age>20)" :exact)
-  (token-found? filterQueryCandidateRe "(name<>john$or$(age>=30$and))" :exact)
+  (token-found? filterQueryCandidateRe
+                "(name<>john$or$(age>=30$and&age<100))"
+                :exact)
   (token-found? fullFIlterQueryExpr "name==Adam$and$age>10" :exact)
   (str/replace "name==Adam$and$age>10" fullFIlterQueryExpr "QQQ")
   (re-matches #"(?<dsads>(<|>|(<=))+)" "<<<="))
@@ -352,7 +354,7 @@
   (build-select "person" "id=111")
   (build-select "person" "<<name>>age")
   (build-select "person" "<<name")
-  (build-select "person" "")
+  (build-select "person" "*")
   (build-select "person" "<<name(name<>admin)")
   (build-select "person" "name==Adam$and$age>10"))
 
@@ -374,10 +376,29 @@
        (create-pairs)
        (check-if-joining-valid)
        (map (partial apply build-subquery))
-      ;;  (merge-sql-subqueries)
-       ))
+       ;;  (merge-sql-subqueries)
+  ))
 
+
+(defn transform-query-into-map
+  [query]
+  (let [q-splitted (rest (str/split query #"/"))
+        view-name (last q-splitted)
+        subqueries (partition 2 2 q-splitted)]
+    {:view view-name, :subqueries subqueries}))
 
 (comment
-  (build-query-from-url "/person/id=111/"))
+  (transform-query-into-map "/Person/id=1/Post/*/admin"))
+
+(def _test-app-data {})
+
+(defn merge-subqueries
+  [app-data s-queries]
+  (throw (RuntimeException. "not implemented yet"))
+  (map #(apply build-select %) s-queries))
+
+(comment
+  (merge-subqueries {}
+                    ((transform-query-into-map "/Person/id=1/Post/*/admin")
+                      :subqueries)))
 

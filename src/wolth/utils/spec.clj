@@ -1,6 +1,6 @@
 (ns wolth.utils.spec
   (:require [clojure.spec.alpha :as s]
-            [wolth.db.helpers :as help]))
+            [wolth.utils.common :as help]))
 
 
 (s/def ::name string?)

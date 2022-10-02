@@ -44,7 +44,7 @@
           result (jdbc/execute! (cursor-pool (ctx :app-name)) query)]
       (as-> ctx it (dissoc it :sql-query) (assoc it :result result)))))
 
-(comment 
+(comment
   (resolve-model-query _test_serializer_data))
 
 (def model-resolver-interceptor
