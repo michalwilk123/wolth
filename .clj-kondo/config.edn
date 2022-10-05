@@ -1,1 +1,3 @@
-{:lint-as {wolth.db.query/def-token clojure.core/def}}
+{:lint-as {wolth.db.query/def-token clojure.core/def,
+           wolth.server.config/def-context clojure.core/def,
+           wolth.server.exceptions/def-interceptor-fn clojure.core/defn}}
