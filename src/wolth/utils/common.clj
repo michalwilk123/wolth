@@ -73,11 +73,13 @@
 
 (defn sift-keys-in-map
   [in-map keys]
+  (assert (vector? keys))
   (into {} (filter #(vector-contains? keys (name (first %))) in-map)))
 
 (comment
   (sift-keys-in-map {:aaa 123, :bbb 222} ["aaa" "bbb"])
-  (sift-keys-in-map {:aaa 123, :bbb 222} ["bbb"]))
+  (sift-keys-in-map {:aaa 123, :bbb 222} ["bbb"])
+  (sift-keys-in-map {:aaa 123, :bbb 222} nil))
 
 (defn assoc-vector
   [in-map vec]
