@@ -9,6 +9,12 @@
                          :ref-type :o2m,
                          :references "Person",
                          :related-name "posts"}]}],
- :roles {:AdminUser [:admin]},
- :serializer {:admin [{:actions "rcu", :fields [""], :table "Person"}],
-              :public {}}}
+ :serializers
+   [{:allowed-roles ["admin"],
+     :name "public",
+     :operations [{:create
+                     {:attached [["note" "Testowa notatka"]], :fields ["name"]},
+                   :delete true,
+                   :model "Person",
+                   :read {:attached [], :fields ["name" "note" "id"]},
+                   :update {:fields ["name"]}}]}]}

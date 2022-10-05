@@ -7,12 +7,13 @@
 
 (def _test-serializer-spec
   {:name "public",
-   :model "User",
-   :read {:fields ["author" "content" "id"], :attached []},
-   :update {:fields ["username" "email"]},
-   :create {:fields ["username" "email" "password"],
-            :attached [["role" "regular"]]},
-   :delete true})
+   :allowed-roles true,
+   :operations [{:model "User",
+                 :read {:fields ["author" "content" "id"], :attached []},
+                 :update {:fields ["username" "email"]},
+                 :create {:fields ["username" "email" "password"],
+                          :attached [["role" "regular"]]},
+                 :delete true}]})
 
 (def _test-object-spec
   '({:name "User",
@@ -23,9 +24,6 @@
         {:constraints [:unique], :name "email", :type :str128}],
      :options [:uuid-identifier]}))
 
-(def _test-json-body
-  {:username "Mariusz", :password "haslo", :email "mariusz@gmail.com"})
-
 (def ^:private _test-normalized-fields
   {:id "65ebc5a7-348c-4bb7-a58b-54d96a1b41bf",
    :username "Mariusz",
@@ -33,6 +31,9 @@
      "100$12$argon2id$v13$qen5BpBkZOs7qT9abjb9iA$eq9Fr5Im3Nqx35GHDIMg7ADbyq09zvuoV+sbvNlYYWI$$$",
    :email "mariusz@gmail.com",
    :role "regular"})
+
+(def _test-json-body
+  {:username "Mariusz", :password "haslo", :email "mariusz@gmail.com"})
 
 (def _test-request-map
   {:json-params _test-json-body,
@@ -145,9 +146,11 @@
   (assert (map? spec))
   (assert (map? params))
   (assert (seq? object-spec))
-  (let [fields (get-in spec (list :create :fields))
-        attatched (get-in spec (list :create :attached))
-        table-name (:name (first object-spec))
+  (let [table-name (:name (first object-spec))
+        related-model (first (filter #(= table-name (% :model))
+                               (spec :operations)))
+        fields (get-in related-model (list :create :fields))
+        attatched (get-in related-model (list :create :attached))
         processed-fields (as-> params it
                            (utils/sift-keys-in-map it fields)
                            (utils/assoc-vector it attatched))]
