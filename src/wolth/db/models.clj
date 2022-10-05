@@ -3,14 +3,16 @@
             [next.jdbc :as jdbc]
             [clojure.string :as str]
             [honey.sql.helpers :as hsql]
-            [wolth.db.helpers :refer
+            [wolth.db.utils :refer [get-data-source]]
+            [wolth.server.config :refer [def-context cursor-pool]]
+            [wolth.utils.common :refer
              [field-lut translate-keys-to-vals constraints-lut cons-not-nil
               vector-contains? compose]]))
 
 
-(def db {:dbtype "h2", :dbname "example"})
-
-(def ds (jdbc/get-datasource db))
+(def-context _test_context
+             {cursor-pool {"test-app" (jdbc/get-datasource
+                                        {:dbtype "h2", :dbname "example"})}})
 
 (def sqlmap {:select [:a :b :c], :from [:foo], :where [:= :foo.a "baz"]})
 
@@ -26,26 +28,6 @@
                   [:primary :key (keyword "(id)")]
                   [:foreign :key (keyword "(id)") :references
                    (keyword "Persons(jakiedID)")]]})
-
-;; (jdbc/execute! ds ["
-;; create table address (
-;;   id int auto_increment primary key,
-;;   name varchar(32),
-;;   email varchar(255)
-;; )"])
-
-(defn execute-honey-map
-  [query]
-  (assert (map? query))
-  (->> query
-       (sql/format)
-       (jdbc/execute! ds)))
-
-
-(comment
-  (execute-honey-map depr-sqlmap3)
-  (jdbc/execute! ds ["TRUNCATE TABLE fruit"])
-  (execute-honey-map {:drop-table :fruit}))
 
 (defn build-single-table-field
   [field]
@@ -106,7 +88,7 @@
 
 
 (defn create-id-field
-  [is-uuid & kwargs]
+  [is-uuid & _kwargs]
   (if is-uuid
     {:name "id", :type :str32, :constraints [:not-null :primary-key]}
     {:name "id",
@@ -170,9 +152,7 @@
 (comment
   (generate-create-table-query _test-object-data-1)
   (generate-create-table-query _test-object-data-2)
-  (generate-create-table-query _test-object-data-3)
-  (jdbc/execute! ds (vector "DROP TABLE Person;"))
-  (jdbc/execute! ds (list (generate-create-table-query _test-object-data-2))))
+  (generate-create-table-query _test-object-data-3))
 
 (defn cross-field-w-related-table
   [table field]
@@ -225,19 +205,20 @@
   (cross-together-table-data [_test-object-data-3]))
 
 (defn create-all-tables
-  [objects-data]
+  [app-name objects-data]
+  (assert (string? app-name))
   (->> objects-data
        (cross-together-table-data)
        (map generate-create-table-query)
        (map list)
-       (map (partial jdbc/execute! ds)))
-  )
+       (map (partial jdbc/execute! (get-data-source app-name)))))
 
 
 (comment
-  (create-all-tables [_test-object-data-1 _test-object-data-2])
-  (create-all-tables [ _test-object-data-1])
-  )
+  (_test_context
+    '(create-all-tables "test-app" [_test-object-data-1 _test-object-data-2]))
+  (_test_context '(create-all-tables "test-app" [_test-object-data-1]))
+  (create-all-tables "test-app" [_test-object-data-1]))
 
 (comment
   (sql/format sqlmap)
