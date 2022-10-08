@@ -2,7 +2,7 @@
   (:gen-class)
   (:require [wolth.utils.cli :as cli]
             [io.pedestal.http.route :as route]
-            [wolth.utils.loader :as load]
+            [wolth.utils.DEPR-loader :as load]
             [wolth.service :as service]
             [io.pedestal.log :as log]
             [io.pedestal.http :as http]))

@@ -1,17 +1,17 @@
-(ns start                               ;; <1>
+(ns wolth.start                               ;; <1>
+  (:gen-class)
   (:require [io.pedestal.http :as http] ;; <2>
-            [wolth.utils.loader :as load]
             [io.pedestal.http.route :as route]
+            [wolth.server.utils :refer [app-path->app-name]]
+            [wolth.utils.loader :refer
+             [load-application! test-application-file! load-user-functionalities
+              store-applications! store-db-connections! store-routes!
+              create-sql-tables! create-admin-account!]]
             [wolth.server.routes :as r])) ;; <3>
 
 (defn respond-hello
   [request]          ;; <1>
   {:status 200, :body "Hello, world!"}) ;; <2>
-
-;; (def routes
-;;   (route/expand-routes                                   ;; <1>
-;;    #{["/greet" :get respond-hello :route-name :greet]})) ;; <2>
-
 
 
 (def initial
@@ -29,15 +29,31 @@
 
 (defonce server-instance (atom initial))
 
-(defn create-server
-  []
-  (doall
-    ;; (prepat)
-    (swap! server-instance http/create-server)))
+(defn create-server [] (doall (swap! server-instance http/create-server)))
 
 (defn start-server [] (http/start @server-instance))
 
 (defn stop-server [] (http/stop @server-instance))
+
+(defn -main
+  [& app-paths]
+  (run! test-application-file! app-paths)
+  (let [applications (->> app-paths
+                          (map load-application!)
+                          (map load-user-functionalities))
+        app-names (map app-path->app-name app-paths)
+        generated-routes (r/generate-full-routes app-names applications)]
+    (store-applications! app-names applications)
+    (store-db-connections! app-names applications)
+    (create-sql-tables! app-names applications)
+    (map (partial apply create-admin-account!) (zipmap app-names applications))
+    ;; (store-routes! generated-routes)
+  ))
+
+(def _test-application-path "test/system/person/person.app.edn")
+
+(comment
+  (-main _test-application-path))
 
 (comment
   (create-server)

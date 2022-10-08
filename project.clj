@@ -31,5 +31,5 @@
                {:aliases {"run-dev"
                             ["trampoline" "run" "-m" "wolth.server/run-dev"]},
                 :dependencies [[io.pedestal/pedestal.service-tools "0.5.10"]]},
-             :uberjar {:aot [wolth.server]}}
-  :main ^{:skip-aot true} wolth.server)
+             :uberjar {:aot [wolth.start]}}
+  :main ^{:skip-aot true} wolth.start)
