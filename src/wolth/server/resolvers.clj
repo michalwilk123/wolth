@@ -1,7 +1,9 @@
 (ns wolth.server.resolvers
   (:require [wolth.server.exceptions :refer [throw-wolth-exception]]
             [wolth.server.config :refer [def-context cursor-pool]]
-            [wolth.db.utils :refer [get-data-source]]
+            [wolth.server.exceptions :refer [def-interceptor-fn]]
+            [io.pedestal.log :as log]
+            [wolth.db.utils :refer [execute-sql-expr!]]
             [next.jdbc :as jdbc]))
 
 (def _test_serializer_data
@@ -42,13 +44,14 @@
              {cursor-pool {"app" (jdbc/get-datasource {:dbtype "h2",
                                                        :dbname "testing"})}})
 
-(defn resolve-model-query
+(def-interceptor-fn
+  resolve-model-query
   [ctx]
   (if-not (contains? ctx :sql-query)
     (throw-wolth-exception :500 "No SQL query found in context!")
     (let [query (ctx :sql-query)
-          result (jdbc/execute! (get-data-source (ctx :app-name)) query)]
-      (as-> ctx it (dissoc it :sql-query) (assoc it :result result)))))
+          result (execute-sql-expr! (get ctx :app-name) query)]
+      (as-> ctx it (dissoc it :sql-query) (assoc it :result (str result))))))
 
 (comment
   (_test-context '(resolve-model-query _test_serializer_data)))
