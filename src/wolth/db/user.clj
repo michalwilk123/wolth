@@ -1,5 +1,9 @@
 (ns wolth.db.user
-  (:require [wolth.db.models :as models]))
+  (:require [wolth.db.models :as models]
+            [wolth.db.utils :refer [execute-sql-expr!]]
+            [io.pedestal.log :as log]
+            [wolth.utils.common :refer [sql-map->map]]
+            [honey.sql :as sql]))
 
 
 (def user-table
@@ -15,25 +19,61 @@
 ; User id is only used for deleting / logging out users
 (def token-table
   {:name "Token",
-   :fields [{:constraints [:not-null], :name "signature", :type :str256}
+   :fields [{:constraints [:not-null :unique], :name "signature", :type :str256}
             {:constraints [:not-null], :name "userId", :type :uuid}],
    :options [:use-h2]})
 
-;; deprecated!
-(def user-admin-view {:admin [{:actions "rcud", :fields "*", :table "User"}]})
+(def user-admin-view
+  {:allowed-roles ["admin"],
+   :name "user-admin",
+   :operations [{:create {:fields ["username" "password" "role" "email"]},
+                 :update {:fields ["username" "password" "role" "email"]},
+                 :read {:fields ["id" "username" "role" "email"]},
+                 :model "User",
+                 :delete true}]})
 
-(defn get-user-auth-data
-  [username db]
-  {:password
-     "100$12$argon2id$v13$qjVHAso9NbIZz1alruEjjg$pobQt1Ij/vk6gmhf1yOCGwNFwoxQzRgQuSFmXBjkg9Y$$$",
-   :role "admin",
-   :username username})
+(def user-regular-view
+  {:allowed-roles true,
+   :name "user-regular",
+   :operations [{:create {:fields ["username" "password" "email"],
+                          :attached [["role" "regular"]]},
+                 :update {:fields ["username" "email"]},
+                 :model "User",
+                 :delete true}]})
+
+(defn format-sql-response [sql-resp])
+
+(comment
+  (format-sql-response [#:USER{:ID "fcb25ade-b382-4d0d-9b69-773b0918db30",
+                         :USERNAME "myAdmin",
+                         :PASSWORD "aaaa",
+                         :ROLE "admin",
+                         :EMAIL nil}]))
+
+(defn fetch-user-data
+  [username app-name]
+  (->> {:select :*, :from [:User], :where [:= :User.username username]}
+       (sql/format)
+       (execute-sql-expr! app-name)
+       (first)
+       (sql-map->map)))
+
+(comment
+  (fetch-user-data "myAdmin" "person"))
 
 
 
 (comment
-  (models/create-all-tables [token-table user-table]))
+  (models/generate-create-table-sql [token-table user-table]))
 
+(defn save-auth-token
+  [user-id token app-name]
+  (log/info ::save-auth-token
+            (format "Saving auth token for user: %s" app-name))
+  (->> {:insert-into [:Token], :values [{:signature token, :userId user-id}]}
+       (sql/format)
+       (execute-sql-expr! app-name)))
 
-(def insert-q
-  {:insert-into [:User], :values [{:username "Tytus", :email "Bomba"}]})
+(comment
+  (save-auth-token "90692522-3c84-4fe4-9fcd-25b7ebaf828d" "TOKEN" "person")
+  (execute-sql-expr! "person" ["DELETE FROM Token;"]))
