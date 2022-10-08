@@ -3,7 +3,7 @@
 
 (defonce cursor-pool (atom nil))
 
-(defonce app-data-container (atom nil))
+(def app-data-container (atom nil))
 
 (defonce routes (atom nil))
 

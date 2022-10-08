@@ -1,8 +1,10 @@
 (ns wolth.server.utils
   (:require [clojure.string :as str]
             [wolth.server.config :refer [app-data-container]]
+            [wolth.server.exceptions :refer [def-interceptor-fn]]
             [wolth.server.exceptions :refer [throw-wolth-exception]]
-            [wolth.utils.common :as common]))
+            [wolth.utils.common :as common]
+            [io.pedestal.log :as log]))
 
 (def _test-app-data
   {:objects
@@ -43,6 +45,7 @@
 
 (defn uri->parsed-info
   [uri method]
+  (log/info ::uri->parsed-info (str "WARTOSC: " uri))
   (let [splitted-names (str/split uri #"/")
         app-name (second splitted-names)
         serializer-name (last splitted-names)
@@ -58,14 +61,32 @@
 
 (comment
   (uri->parsed-info "/app/Person/public" :post)
+  (uri->parsed-info "/person/User/user-regular" :post)
   (uri->parsed-info "/app/Person/firstquery/NextTable/*/public" :get))
 
 (defn uri->app-name [uri] (second (str/split uri #"/")))
 
 (comment
-  (uri->app-name "/app/Person/public"))
+  (uri->app-name "/app/Person/public")
+  (uri->app-name "/app/Person"))
 
-(defn utility-context [ctx] (merge ctx {:app-name (uri->app-name (ctx :uri))}))
+;; (def-interceptor-fn utility-interceptor-fn [ctx] (assoc ctx :appname
+;; (uri->app-name (ctx :uri))))
+(def-interceptor-fn utility-interceptor-fn
+                    [ctx]
+                    (assoc ctx
+                      :app-name (uri->app-name (get-in ctx [:request :uri]))))
 
 (def utility-interceptor
-  {:name ::UTILITY-INTERCEPTOR, :enter utility-context})
+  {:name ::WOLTH-UTILITY-INTERCEPTOR, :enter utility-interceptor-fn})
+
+(defn app-path->app-name
+  [path]
+  (-> path
+      (str/split #"/")
+      (last)
+      (str/split #"\.")
+      (first)))
+
+(comment
+  (app-path->app-name "test/system/person/person.app.edn"))
