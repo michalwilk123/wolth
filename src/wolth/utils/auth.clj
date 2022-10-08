@@ -1,13 +1,14 @@
 (ns wolth.utils.auth
-  (:require [wolth.db.user :refer [get-user-auth-data]]
-            [wolth.utils.crypto :as crypto]
-            [wolth.server.utils :as server-utils]
-            [wolth.server.config :refer
-             [def-context cursor-pool app-data-container]]
-            [wolth.db.utils :refer [get-data-source]]
-            [next.jdbc :as jdbc]
-            [clojure.string :as str]
-            [wolth.server.exceptions :refer [throw-wolth-exception]])
+  (:require
+    [wolth.db.user :refer [fetch-user-data save-auth-token]]
+    [wolth.utils.crypto :as crypto]
+    [wolth.server.utils :as server-utils]
+    [wolth.server.config :refer [def-context cursor-pool app-data-container]]
+    [wolth.db.utils :refer [get-datasource-from-memory]]
+    [next.jdbc :as jdbc]
+    [clojure.string :as str]
+    [wolth.server.exceptions :refer [throw-wolth-exception def-interceptor-fn]]
+    [io.pedestal.http.body-params :as body-params])
   (:import [java.io IOException]
            [java.time Instant]))
 
@@ -29,61 +30,42 @@
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkYW0iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY0MTQ3NzI5LCJ0dGwiOjYwNDgwMH0.kv47aXxC7EbyuR_yg8EpoeRXiHfKon7MJP5LSFcyE0a")
 
 (def _test_authenticated_ctx
-  {:json-params {:name "Jake"},
-   :protocol "HTTP/1.1",
-   :async-supported? true,
-   :remote-addr "127.0.0.1",
+  {:logged-user {:role "admin", :username "adam"},
    :app-name "test-app",
-   :headers
-     {"accept" "*/*",
-      "user-agent" "Thunder Client (https://www.thunderclient.com)",
-      "connection" "close",
-      "host" "localhost:8002",
-      "accept-encoding" "gzip, deflate, br",
-      "content-length" "20",
-      "auth-token"
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkYW0iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY0MTQ3NzI5LCJ0dGwiOjYwNDgwMH0.kv47aXxC7EbyuR_yg8EpoeRXiHfKon7MJP5LSFcyE0Y",
-      "content-type" "application/json"},
-   :server-port 8002,
-   :content-length 20,
-   :logged-user {:role "admin", :username "adam"},
-   :content-type "application/json",
-   :path-info "/test-app/User/public",
-   :character-encoding "UTF-8",
-   :uri "/test-app/User/public",
-   :server-name "localhost",
-   :query-string nil,
-   :path-params {},
-   :scheme :http,
-   :request-method :post,
-   :context-path ""})
+   :request
+     {:json-params {:name "Jake"},
+      :headers
+        {"accept" "*/*",
+         "user-agent" "Thunder Client (https://www.thunderclient.com)",
+         "connection" "close",
+         "host" "localhost:8002",
+         "accept-encoding" "gzip, deflate, br",
+         "content-length" "20",
+         "auth-token"
+           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkYW0iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY0MTQ3NzI5LCJ0dGwiOjYwNDgwMH0.kv47aXxC7EbyuR_yg8EpoeRXiHfKon7MJP5LSFcyE0Y",
+         "content-type" "application/json"},
+      :path-info "/test-app/User/public",
+      :uri "/test-app/User/public",
+      :request-method :post,
+      :context-path ""}})
 
 (def _test-request-map
-  {:json-params {:name "Jake"},
-   :protocol "HTTP/1.1",
-   :async-supported? true,
-   :remote-addr "127.0.0.1",
-   :headers {"accept" "*/*",
-             "user-agent" "Thunder Client (https://www.thunderclient.com)",
-             "connection" "close",
-             "host" "localhost:8002",
-             "accept-encoding" "gzip, deflate, br",
-             "content-length" "20",
-             "auth-token" _test-jwt-token,
-             "content-type" "application/json"},
-   :server-port 8002,
-   :content-length 20,
-   :content-type "application/json",
-   :path-info "/app/User/public",
-   :character-encoding "UTF-8",
-   :uri "/app/User/public",
-   :server-name "localhost",
-   :app-name "test-app",
-   :query-string nil,
-   :path-params {},
-   :scheme :http,
-   :request-method :post,
-   :context-path ""})
+  {:app-name "person",
+   :request {:json-params {:username "myAdmin", :password "admin"},
+             :headers {"accept" "*/*",
+                       "user-agent"
+                         "Thunder Client (https://www.thunderclient.com)",
+                       "connection" "close",
+                       "host" "localhost:8002",
+                       "accept-encoding" "gzip, deflate, br",
+                       "content-length" "20",
+                       "auth-token" _test-jwt-token,
+                       "content-type" "application/json"},
+             :query-string nil,
+             :path-params {},
+             :scheme :http,
+             :request-method :post,
+             :context-path ""}})
 
 (def ^:private _test-app-data
   {:objects
@@ -108,7 +90,7 @@
 (def-context _test-context
              {cursor-pool {"test-app" (jdbc/get-datasource {:dbtype "h2",
                                                             :dbname "app"})},
-              app-data-container {"test-app" _test-app-data}})
+              app-data-container {"person" _test-app-data}})
 
 (defn get-current-epoch
   "Get current date since epoch in seconds"
@@ -120,7 +102,6 @@
 (comment
   (get-current-epoch))
 
-(defn save-auth-token [db payload] (println "Saving token..." payload))
 
 (defn parse-jwt-safely
   [unsafe]
@@ -160,63 +141,91 @@
     (str/join "." (list JWT-HEADER encoded-payload signature))))
 
 (comment
-  (create-jwt-string {:username "Michal", :role "admin", :liczba 420}
-                     "HASHHASLA"))
+  (create-jwt-string
+    {:username "myAdmin", :role "admin", :created-at 1664147729, :ttl 604800}
+    "HASHHASLA"))
 
 (defn fetch-and-validate-jwt-token
-  [jwt-string db]
+  [jwt-string app-name]
   (let [[header payload signature] (parse-jwt-safely jwt-string)]
+    (println header payload signature)
     (if (not= header JWT-HEADER)
       (throw-wolth-exception :400 "Unknown wolth exception")
       nil)
-    (if-let [user-data (get-user-auth-data (payload :username) db)]
-      (let [calculated-jwt-string (create-jwt-string payload
-                                                     (user-data :password))
-            generated-sig (last (str/split calculated-jwt-string #"\."))]
-        (if (crypto/compare-digest generated-sig signature)
-          (dissoc user-data :password)
-          nil))
-      (throw-wolth-exception :404
-                             (str "Cannot find such user: "
-                                  (payload :username))))))
+    (let [user-data (fetch-user-data (payload :username) app-name)]
+      (if (empty? user-data)
+        (throw-wolth-exception :404
+                               (str "Cannot find user: " (payload :username)))
+        (let [oo (println user-data)
+              calculated-jwt-string (create-jwt-string payload
+                                                       (user-data :password))
+              generated-sig (last (str/split calculated-jwt-string #"\."))]
+          (if (crypto/compare-digest generated-sig signature)
+            (dissoc user-data :password)
+            nil))))))
 
 (comment
   (fetch-and-validate-jwt-token
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkYW0iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY0MTQ3NzI5LCJ0dGwiOjYwNDgwMH0.kv47aXxC7EbyuR_yg8EpoeRXiHfKon7MJP5LSFcyE0Y"
-    nil)
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Im15QWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY1MjE5MTc1LCJ0dGwiOjYwNDgwMH0.1g45U6Srj5xkU6oUxQSdKTqLd_t71gfkMyXGmThsd_E"
+    "person")
   (fetch-and-validate-jwt-token
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkYW0iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY0MTQ3NzI5LCJ0dGwiOjYwNDgwMH0.-9uX2yPe-sMmULmE69RF6btB1Rex2aYFtkkH4OjgrRs"
-    nil))
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Im15QWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY1MjE5MTc1LCJ0dGwiOjYwNDgwMH0.1g45U6Srj5xkU6oUxQSdKTqLd_t71gfkMyXGmThsd_E"
+    "person"))
 
 
 (defn build-and-save-jwt-token
-  [username role password-hash db]
+  [user-id username role password-hash app-name]
   (let [token-data {:username username,
                     :role role,
                     :created-at (get-current-epoch),
                     :ttl DEFAULT-TOKEN-EXPIRATION-SECONDS}
         jwt-string (create-jwt-string token-data password-hash)]
-    (save-auth-token db jwt-string)
+    (save-auth-token user-id jwt-string app-name)
     jwt-string))
 
 (comment
   (build-and-save-jwt-token
-    "adam" "admin"
-    "100$12$argon2id$v13$qjVHAso9NbIZz1alruEjjg$pobQt1Ij/vk6gmhf1yOCGwNFwoxQzRgQuSFmXBjkg9Y$$$"
-      nil))
+    "8dbe6592-6103-4d8d-9bfc-c33ddb553ac7"
+    "myAdmin" "admin"
+    "100$12$argon2id$v13$5mghgFpvKNmkJVtA6EblNw$gorf8qYI4q9nVxY2+v237cE5vOlEQzbFqrUMJfgToOE$$$"
+      "person"))
 
+(def-interceptor-fn
+  token-request
+  [ctx]
+  (let [body-params (select-keys (get-in ctx [:request :json-params])
+                                 [:username :password])
+        app-name (ctx :app-name)]
+    (if-let [user-data (fetch-user-data (body-params :username) app-name)]
+      (if (or (println (body-params :password) (user-data :password))
+              (crypto/verify-password (body-params :password)
+                                      (user-data :password)))
+        (let [token-parts (vals (select-keys user-data
+                                             [:id :username :role :password]))
+              jwt-token (apply build-and-save-jwt-token
+                          (concat token-parts (list app-name)))]
+          (assoc ctx :response {:status 200, :body {:jwt-token jwt-token}}))
+        (throw-wolth-exception :403 "Bad password. Access denied"))
+      (throw-wolth-exception :404 "Cannot find this user in the database"))))
+
+(comment
+  (token-request _test-request-map))
+
+(def token-auth-req-interceptor
+  {:name ::TOKEN-WOLTH-INTERCEPTOR, :enter token-request})
 
 #_"
   If user has invalid header, bad password, bad username then
   exception is thrown. If header does not exist, user
   is simply unauthorized, but the request is not interrupted"
-(defn authenticate-user
+(def-interceptor-fn
+  authenticate-user
   [ctx]
-  (if-let [jwt-token (get-in ctx [:headers token-header-field])]
-    (let [data-source (get-data-source (ctx :app-name))]
-      (if-let [user-data (fetch-and-validate-jwt-token jwt-token data-source)]
-        (assoc ctx :logged-user user-data)
-        (throw-wolth-exception :401 "Cannot authenticate user!")))
+  (if-let [jwt-token (get-in ctx [:request :headers token-header-field])]
+    (if-let [user-data (fetch-and-validate-jwt-token jwt-token
+                                                     (get ctx :app-name))]
+      (assoc ctx :logged-user user-data)
+      (throw-wolth-exception :401 "Cannot authenticate user!"))
     (assoc ctx :logged-user nil)))
 
 (comment
@@ -224,7 +233,7 @@
   (_test-context '(authenticate-user
                    (update-in
                     _test-request-map
-                    [:headers token-header-field]
+                    [:request :headers token-header-field]
                     (fn [_] _test-incorrect-jwt-token)))))
 
 (def authenticator-interceptor
@@ -286,25 +295,26 @@
 #_"sprawdzamy czy istnieje mapa z danymi, jezeli nie to ustawiamy role jako publiczna
    Potem sprawdzamy czy serializer zgadza sie z rola uzytkownika. Jezeli
    nie to rzucamy wyjatek 403"
-(defn authorize-user
+(def-interceptor-fn
+  authorize-user
   [ctx]
-  (let [user-data (ctx :logged-user)
+  (let [user-data (get ctx :logged-user)
         [app-name serializer-name accessed-tables]
-          (server-utils/uri->parsed-info (ctx :uri) :post)
+          (server-utils/uri->parsed-info (get-in ctx [:request :uri]) :post)
         app-data (server-utils/get-associated-app-data! app-name)
         serializer (first (filter #(= serializer-name (% :name))
                             (app-data :serializers)))]
     (if (nil? serializer)
       (throw-wolth-exception :400 "Cannot find such view")
       (println user-data))
-    (authorize-by-user-role (serializer :allowed-roles) (user-data :role))
+    (authorize-by-user-role (serializer :allowed-roles) (get user-data :role))
     (authorize-by-user-operation serializer
                                  accessed-tables
-                                 (ctx :request-method))
+                                 (get-in ctx [:request :request-method]))
     (assoc ctx :authorized true)))
 
 (comment
-  (_test-context '(authorize-user _test_authenticated_ctx) ))
+  (_test-context '(authorize-user _test_authenticated_ctx)))
 
 (def authorizer-interceptor
   {:name ::AUTHORIZER-INTERCEPTOR, :enter authorize-user})

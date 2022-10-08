@@ -1,15 +1,21 @@
 (ns wolth.server.serializers
   (:require [wolth.utils.common :as utils]
-            [wolth.server.exceptions :refer [throw-wolth-exception]]
-            [wolth.server.utils :as server-utils]
+            [wolth.server.exceptions :refer
+             [throw-wolth-exception def-interceptor-fn]]
             [honey.sql :as sql]
-            [wolth.db.fields :as fields]))
+            [ring.util.codec :refer [url-decode]]
+            [io.pedestal.log :as log]
+            [wolth.server.utils :as server-utils]
+            [wolth.db.query :refer [build-select merge-select-hsql]]
+            [wolth.server.config :refer [def-context app-data-container]]
+            [wolth.db.fields :as fields]
+            [io.pedestal.http.body-params :as body-params]))
 
 (def _test-serializer-spec
   {:name "public",
    :allowed-roles true,
    :operations [{:model "User",
-                 :read {:fields ["author" "content" "id"], :attached []},
+                 :read {:fields ["email" "username" "id"], :attached []},
                  :update {:fields ["username" "email"]},
                  :create {:fields ["username" "email" "password"],
                           :attached [["role" "regular"]]},
@@ -50,15 +56,37 @@
    :server-port 8002,
    :content-length 20,
    :content-type "application/json",
-   :path-info "/app/User/public",
+   :path-info "/test-app/User/public",
    :character-encoding "UTF-8",
-   :uri "/app/User/public",
+   :uri "/test-app/User/public",
    :server-name "localhost",
    :query-string nil,
    :path-params {},
    :scheme :http,
    :request-method :post,
    :context-path ""})
+
+(def ^:private _test-app-data
+  {:objects
+     [{:name "User",
+       :fields
+         [{:constraints [:not-null :unique], :name "username", :type :str128}
+          {:constraints [:not-null], :name "password", :type :password}
+          {:constraints [:not-null], :name "role", :type :str128}
+          {:constraints [:unique], :name "email", :type :str128}],
+       :options [:uuid-identifier]}],
+   :functions [{:name "getDate"}],
+   :serializers [{:name "public",
+                  :allowed-roles ["admin"],
+                  :operations
+                    [{:model "User",
+                      :read {:fields ["author" "content" "id"], :attached []},
+                      :update {:fields ["username" "email"]},
+                      :create {:fields ["username" "email" "password"],
+                               :attached [["role" "regular"]]},
+                      :delete true}]}]})
+
+(def-context _test-context {app-data-container {"test-app" _test-app-data}})
 
 (defn normalize-field
   [verbose-field]
@@ -134,12 +162,12 @@
                                         :role "regular"}
                                        _test-object-spec))
 
-(defn fields->sql
+(defn fields->insert-sql
   [table fields]
   (sql/format {:insert-into [(keyword table)], :values [fields]}))
 
 (comment
-  (fields->sql "User" _test-normalized-fields))
+  (fields->insert-sql "User" _test-normalized-fields))
 
 (defn serialize-post
   [params spec object-spec]
@@ -157,29 +185,119 @@
     (if-let [normalized-fields (normalize-field-associeted-w-object
                                  processed-fields
                                  object-spec)]
-      (fields->sql table-name normalized-fields)
+      (fields->insert-sql table-name normalized-fields)
       (throw-wolth-exception :400))))
 
 (comment
   (serialize-post _test-json-body _test-serializer-spec _test-object-spec))
 
-(defn serialize-into-model
-  [ctx]
-  (let [[app-name serializer-name tables]
-          (server-utils/uri->parsed-info (ctx :uri) (ctx :request-method))
-        body-params (ctx :json-params)
-        path-params (ctx :path-params)
-        app-data (server-utils/get-associated-app-data! app-name)
-        objects-data (server-utils/get-associated-objects app-data tables)
-        serializer-data (server-utils/get-serializer-data app-data
-                                                          serializer-name)]
-    (->> (case (ctx :request-method)
-           :post (serialize-post body-params serializer-data objects-data)
-           :get (println "MAM geta"))
-         (assoc ctx :sql-query))))
+
+(defn serialize-get
+  [path-params serializer-data objects-data]
+  (str path-params serializer-data objects-data (type path-params))
+  (let [serializer-fields
+          (map (fn [obj]
+                 (as-> (get serializer-data :operations) it
+                   (filter #(= (get % :model) (get obj :name)) it)
+                   (first it)
+                   (get-in it [:read :fields])
+                   (map keyword it)))
+            objects-data)
+        object-names (map #(get % :name) objects-data)
+        queries (map url-decode (vals path-params))]
+    (as-> (utils/zip object-names queries serializer-fields) it
+      (map (partial apply build-select) it)
+      (merge-select-hsql it)
+      (sql/format it))))
 
 (comment
-  (serialize-into-model _test-request-map))
+  (serialize-get {:personQuery "<<username"}
+                 _test-serializer-spec
+                 _test-object-spec))
+
+
+(defn fields->update-sql
+  [table fields id-field]
+  (sql/format
+    {:update [(keyword table)], :set fields, :where [:= :id id-field]}))
+
+(comment
+  (fields->update-sql "User"
+                      (select-keys _test-normalized-fields [:email])
+                      "35fcfd5c-674e-4d56-9483-a026d50ac658"))
+
+
+(defn serialize-patch
+  [path-params body-params spec -object-spec]
+  (assert (map? spec))
+  (assert (map? body-params))
+  (assert (seq? -object-spec))
+  (let [object-spec (first -object-spec)
+        table-name (:name object-spec)
+        related-model (first (filter #(= table-name (% :model))
+                               (spec :operations)))
+        fields (get-in related-model (list :update :fields))
+        attatched (get-in related-model (list :update :attached))
+        processed-fields (as-> body-params it
+                           (utils/sift-keys-in-map it fields)
+                           (utils/assoc-vector it attatched))
+        object-identifier (first (vals path-params))]
+    (if-let [normalized-fields (normalize-field-associeted-w-object
+                                 processed-fields
+                                 (list (dissoc object-spec :options)))]
+      (fields->update-sql table-name normalized-fields object-identifier)
+      (throw-wolth-exception :400))))
+
+(comment
+  (serialize-patch (select-keys _test-json-body [:email])
+                   _test-serializer-spec
+                   _test-object-spec
+                   {:userId "35fcfd5c-674e-4d56-9483-a026d50ac658"}))
+
+(defn fields->delete-sql
+  [table id-field]
+  (sql/format {:delete-from [(keyword table)], :where [:= :id id-field]}))
+
+(comment
+  (fields->delete-sql "User" "6d5751d7-b312-422e-9283-1b1aa72da956"))
+
+(defn serialize-delete
+  [path-params -object-spec]
+  (assert (seq? -object-spec))
+  (let [object-spec (first -object-spec)
+        table-name (:name object-spec)
+        object-identifier (first (vals path-params))]
+    (fields->delete-sql table-name object-identifier)))
+
+(comment
+  (serialize-delete {:userId "35fcfd5c-674e-4d56-9483-a026d50ac658"}
+                    _test-object-spec))
+
+
+(def-interceptor-fn
+  serialize-into-model
+  [ctx]
+  (let [request-data (get ctx :request)
+        [app-name serializer-name tables] (server-utils/uri->parsed-info
+                                            (get request-data :uri)
+                                            (get request-data :request-method))
+        body-params (get request-data :json-params)
+        path-params (get request-data :path-params)
+        app-data (server-utils/get-associated-app-data! app-name)
+        objects-data (server-utils/get-associated-objects app-data tables)
+        serializer-data (first (filter #(= serializer-name (% :name))
+                                 (get app-data :serializers)))]
+    (->>
+      (case (get request-data :request-method)
+        :post (serialize-post body-params serializer-data objects-data)
+        :get (serialize-get path-params serializer-data objects-data)
+        :patch
+          (serialize-patch path-params body-params serializer-data objects-data)
+        :delete (serialize-delete path-params objects-data))
+      (assoc ctx :sql-query))))
+
+(comment
+  (_test-context '(serialize-into-model _test-request-map)))
 
 
 (defn serialize-into-bank [ctx] ctx)
