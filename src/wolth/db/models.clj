@@ -1,18 +1,12 @@
 (ns wolth.db.models
   (:require [honey.sql :as sql]
-            [next.jdbc :as jdbc]
             [clojure.string :as str]
             [honey.sql.helpers :as hsql]
-            [wolth.db.utils :refer [get-data-source]]
-            [wolth.server.config :refer [def-context cursor-pool]]
             [wolth.utils.common :refer
              [field-lut translate-keys-to-vals constraints-lut cons-not-nil
               vector-contains? compose]]))
 
 
-(def-context _test_context
-             {cursor-pool {"test-app" (jdbc/get-datasource
-                                        {:dbtype "h2", :dbname "example"})}})
 
 (def sqlmap {:select [:a :b :c], :from [:foo], :where [:= :foo.a "baz"]})
 
@@ -90,7 +84,7 @@
 (defn create-id-field
   [is-uuid & _kwargs]
   (if is-uuid
-    {:name "id", :type :str32, :constraints [:not-null :primary-key]}
+    {:name "id", :type :uuid, :constraints [:not-null :primary-key]}
     {:name "id",
      :type :int,
      :constraints [:not-null :primary-key :auto-increment]}))
@@ -204,21 +198,17 @@
   (cross-together-table-data [_test-object-data-1 _test-object-data-2])
   (cross-together-table-data [_test-object-data-3]))
 
-(defn create-all-tables
-  [app-name objects-data]
-  (assert (string? app-name))
+(defn generate-create-table-sql
+  [objects-data]
+  (assert (or (seq? objects-data) (vector? objects-data)))
   (->> objects-data
        (cross-together-table-data)
        (map generate-create-table-query)
-       (map list)
-       (map (partial jdbc/execute! (get-data-source app-name)))))
-
+       (map list)))
 
 (comment
-  (_test_context
-    '(create-all-tables "test-app" [_test-object-data-1 _test-object-data-2]))
-  (_test_context '(create-all-tables "test-app" [_test-object-data-1]))
-  (create-all-tables "test-app" [_test-object-data-1]))
+  (generate-create-table-sql [_test-object-data-1 _test-object-data-2])
+  (generate-create-table-sql [_test-object-data-1]))
 
 (comment
   (sql/format sqlmap)

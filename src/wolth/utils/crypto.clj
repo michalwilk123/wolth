@@ -70,11 +70,17 @@
     "password"
     "100$12$argon2id$v13$uvJ6JRCML8HgSajmLQ3Hvg$waw1JvlHdh2iCzF1qfM/zbTjZYCoIYLUwZoPE4kZjUY$$$")
   (verify-password
+    "admin"
+    "100$12$argon2id$v13$GpJ/B35dT/W9yGTA5UDkzw$BjfFf3h6yWYdydwHnuk3AtvtjyLmvyQx4sQQsr3eh0s$$$")
+  (verify-password
     "password"
     "100$12$argon2id$v13$uvJ6JRCML8HgSajmLQ3Hvg$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA$$$"))
 
 
-(defn create-password-hash [password] (hash-with :argon2 password))
+(defn create-password-hash
+  [password]
+  (assert (string? password))
+  (hash-with :argon2 password))
 
 (comment
-  (create-password-hash "password"))
+  (create-password-hash "admin"))

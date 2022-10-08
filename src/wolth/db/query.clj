@@ -347,16 +347,21 @@
 
 
 (defn build-select
-  [table-name selector]
-  (build-subquery {:select :*, :from (keyword table-name)} table-name selector))
+  [table-name selector & [fields]]
+  (build-subquery {:select (or fields :*), :from (keyword table-name)}
+                  table-name
+                  selector))
 
 (comment
   (build-select "person" "id=111")
   (build-select "person" "<<name>>age")
   (build-select "person" "<<name")
   (build-select "person" "*")
+  (build-select "User" "*" (list :author :content :id))
   (build-select "person" "<<name(name<>admin)")
   (build-select "person" "name==Adam$and$age>10"))
+
+(defn merge-select-hsql [queries] (first queries))
 
 (defn build-delete
   [table-name selector]
@@ -365,7 +370,6 @@
 (comment
   (build-delete "person" "id=111"))
 
-(defn merge-sql-subqueries [subqueries] "MERGED")
 
 (defn build-query-from-url
   [url-string]

@@ -1,4 +1,5 @@
-(ns wolth.utils.common)
+(ns wolth.utils.common
+  (:require [clojure.string :as str]))
 
 (def field-lut
   {:char "VARCHAR(1)",
@@ -7,7 +8,7 @@
    :str32 "VARCHAR(32)",
    :str128 "VARCHAR(128)",
    :str256 "VARCHAR(256)",
-   :uuid "VARCHAR(32)",
+   :uuid "VARCHAR(48)",
    :password "VARCHAR(128)",
    :bool "BOOLEAN",
    :text "TEXT",
@@ -90,3 +91,28 @@
 (comment
   (assoc-vector {:aaa 123, :bbb 111} [["ccc" 333] ["bbb" 999]])
   (assoc-vector {:aaa 123, :bbb 111} [["ccc" 333] ["ddd" 999]]))
+
+(defn sql-map->map
+  [nmap]
+  (into {}
+        (map (fn [[k val]]
+               [(-> k
+                    (name)
+                    (str/split #"/")
+                    (last)
+                    (str/lower-case)
+                    (keyword)) val])
+          nmap)))
+
+
+(comment
+  (sql-map->map #:USER{:ID "440b753d-1928-4007-bcd5-392ef5b3d0e7",
+                 :USERNAME "admin",
+                 :PASSWORD "haslo",
+                 :ROLE "admin",
+                 :EMAIL nil}))
+
+(defn zip [& colls] (partition (count colls) (apply interleave colls)))
+
+(comment
+  (zip (range 10) (repeat 10 "AAA")))
