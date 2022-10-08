@@ -4,7 +4,7 @@
             [io.pedestal.http.body-params :as body-params]
             [io.pedestal.http.route :as route]
             [ring.util.response :as ring-resp]
-            [wolth.utils.loader :as loader]))
+            [wolth.utils.DEPR-loader :as loader]))
 
 
 
