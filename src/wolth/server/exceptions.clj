@@ -1,6 +1,7 @@
 (ns wolth.server.exceptions
   (:import [java.lang AssertionError Exception])
-  (:require [clojure.stacktrace :refer [print-stack-trace]]))
+  (:require [clojure.stacktrace :refer [print-stack-trace]]
+            [io.pedestal.log :as log]))
 
 (def exceptions-map
   {:400 "Bad request. User has not provided correct data for given endpoint.",
@@ -14,8 +15,10 @@
 (defn throw-wolth-exception
   ([code additional-info]
    (if-let [exc-message (exceptions-map code)]
-     (let [payload {:type code, :info (or additional-info exc-message)}]
+     (let [payload {:status (Integer/parseInt (name code)),
+                    :body (or additional-info exc-message)}]
        (println payload)
+       (log/error ::WOLTH-EXCEPTION payload)
        (throw (ex-info "WolthException" payload)))
      (throw-wolth-exception :500
                             (str "Unknown exception code thrown: "
@@ -46,21 +49,23 @@ Interceptor macro has to objectives:
            (try
              ~@body
              (catch AssertionError e#
-               (assoc ctx#
-                 :exception-occured {:type 400,
-                                     :info (str "Got unexpected data. Error:" e#
-                                                " Traceback: "
-                                                  (with-out-str
-                                                    (print-stack-trace e#)))}))
+               (merge ctx#
+                      {:response {:status 400,
+                                  :body (str "Got unexpected data. Error:" e#
+                                             " Traceback: " (with-out-str
+                                                              (print-stack-trace
+                                                                e#)))},
+                       :exception-occured true}))
              (catch clojure.lang.ExceptionInfo e#
-               (assoc ctx# :exception-occured (ex-data e#)))
+               (merge ctx# {:exception-occured true, :response (ex-data e#)}))
              (catch Exception e#
-               (assoc ctx#
-                 :exception-occured
-                   {:type 500,
-                    :info (str "Got unexpected error: " e#
-                               " Traceback: " (with-out-str (print-stack-trace
-                                                              e#)))}))))))))
+               (merge ctx#
+                      {:exception-occured true,
+                       :response {:status 500,
+                                  :body (str "Got unexpected error: " e#
+                                             " Traceback: " (with-out-str
+                                                              (print-stack-trace
+                                                                e#)))}}))))))))
 
 
 
@@ -76,5 +81,6 @@ Interceptor macro has to objectives:
   (gg {:json {:name "Jake"}})
   (hh {:json {:name "Jake"}})
   (jj {:json {:name "Jake"}})
-  (ff {:exception-occured {:type 401, :info "BLAD AUTORYZACJI"}}))
+  (ff {:exception-occured true,
+       :response {:status 401, :body "BLAD AUTORYZACJI"}}))
 
