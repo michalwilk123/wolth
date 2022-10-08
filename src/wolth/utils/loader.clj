@@ -1,154 +1,168 @@
 (ns wolth.utils.loader
-  (:require [io.pedestal.http :as http]
-            [wolth.utils.file-helpers :as fh]
-            [ring.util.response :as ring-resp]))
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [wolth.utils.spec :refer [test-app-structure]]
+            [wolth.db.user :as user]
+            [wolth.db.utils :refer [execute-sql-expr!]]
+            [next.jdbc :refer [get-datasource]]
+            [wolth.db.models :refer [generate-create-table-sql]]
+            [wolth.utils.crypto :refer [create-password-hash]]
+            [wolth.db.fields :refer [create-uuid]]
+            [wolth.server.config :refer [cursor-pool app-data-container]]
+            [io.pedestal.log :as log]
+            [next.jdbc :as jdbc]))
+
+(def _test-application-path "test/system/person/person.app.edn")
+
+(def _test-app-data
+  {:meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
+   :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
+                       {:name "note", :type :text}],
+              :name "Person",
+              :options [:uuid-identifier]}
+             {:fields [{:name "content", :type :text}],
+              :name "Post",
+              :options [:uuid-identifier],
+              :relations [{:name "author",
+                           :ref-type :o2m,
+                           :references "Person",
+                           :related-name "posts"}]}],
+   :persistent-db {:dbname "mydatabase", :dbtype "h2"},
+   :serializers [{:allowed-roles ["public"],
+                  :name "public",
+                  :operations [{:create {:attached [["note" "Testowa notatka"]],
+                                         :fields ["name"]},
+                                :delete true,
+                                :model "Person",
+                                :read {:attached [],
+                                       :fields ["name" "note" "id"]},
+                                :update {:fields ["name"]}}]}]})
 
 
+(defn throw-loader-exception
+  [reason]
+  (println {:info reason})
+  (throw (ex-info "WolthLoaderException" {:info reason})))
 
-(defonce user-modules (atom {}))
-
-(def standard-interceptors {:json http/json-body, :html http/html-body})
-
-(defn assign-interceptor-func
-  [intercep]
-  (let [int-symbol (or (get standard-interceptors (first intercep))
-                       (get @user-modules (first intercep))
-                       (throw (AssertionError.
-                                "I don't know what this interceptor is")))
-        optional-args (second intercep)]
-    (if (fn? int-symbol) (apply int-symbol optional-args) int-symbol)))
-
-
-(defn object-interceptors
-  [interceptors all-intercep]
-  (->> interceptors
-       (map all-intercep)
-       (apply merge)
-       (map assign-interceptor-func)
-       (into [])
-       ;; (assign-inter-fn)
-       ;; (construct-interceptor)
-       ;; (map (fn construct-interceptor [single-inter-fn]
-       ;;        (cond
-       ;;          (vector? single-inter) (apply)
-       ;;          (nil? single-inter) :else
-       ;;          (throw
-       ;;            (ex-info
-       ;;              "The second arg of intercep map should be vector or
-       ;;              nil")))))
-  ))
-
-
-;; this should be expanded to support more than just default response value
-(defn object-default-route
-  [obj-intercep object]
-  (or (vector? obj-intercep)
-      (throw (RuntimeException. "The obj-intercep should always be a VECTOR!")))
-  (conj obj-intercep
-        (fn default-resp [r] (ring-resp/response (object :default-data)))))
-
-(comment
-  (ring-resp/response {:hello "world"}))
-
-(defn routes-from-object
-  [prepared-interceptors single-routes-map prefix]
-  [(str prefix (single-routes-map :url-name)) :any
-   (object-default-route prepared-interceptors single-routes-map) :route-name
-   (keyword
-     (or (single-routes-map :name) (single-routes-map :url-name) "undefined"))])
-
-(defn routes-from-map
-  [parsed-config prefix]
-  (println (str "PARSED" parsed-config))
-  (let [interceptors (parsed-config :interceptors)
-        object-list (parsed-config :objects)]
-    (set (concat (map (fn create-route [obj]
-                        (routes-from-object
-                          (object-interceptors
-                            (cons :all (obj :additional-interceptors))
-                            interceptors)
-                          obj
-                          prefix))
-                   object-list)))))
-
-
-;; TODO: musisz dodać tutaj opcje warunkowego dodawania modułów
-;; załóżmy że będzie więcej niż jedna aplikacja korzystająca z tego samego
-;; modułu
-(defn load-application-modules!
-  [config]
-  (doall (map (fn load-and-add-module [module-vec]
-                (let [mod-path (first module-vec)
-                      int-dict (second module-vec)]
-                  (load-file mod-path)
-                  (swap! user-modules merge int-dict)))
-           (get config :modules)))
-  config)
-
-(defn create-routes-for-one-application
-  [filepath]
-  (let [prefix (fh/create-app-name-prefix filepath)]
-    (-> filepath
-        (fh/get-app-file-content)
-        (fh/parsed-app-configuration)
-        (load-application-modules!)
-        (routes-from-map prefix))))
-
-(defn merge-app-routes [routes] (first routes))
-
-(defn load-single-app-file
-  [path]
-  (-> path
-      (fh/get-app-file-content)
-      (fh/parsed-app-configuration)))
-
-(defn load-single-mod
-  [path mod-map & [cache]]
-  (load-file path)
-  (for [value mod-map]
-    (or (and cache (@user-modules (first value)))
-        (swap! user-modules (fn [current mod] (apply assoc current mod))
-          value))))
-
+(defn load-application!
+  [app-path]
+  (-> app-path
+      (slurp)
+      (read-string)))
 
 (comment
-  (load-single-mod "test/system/hello_world/testing-module.clj"
-                   '{:another dummy-wolth-module/test-inter-w-args,
-                     :test-intercep dummy-wolth-module/test-inter}
-                   :cache)
-  (load-single-mod "test/system/hello_world/testing-module.clj"
-                   '{:another dummy-wolth-module/test-inter-w-args,
-                     :test-intercep dummy-wolth-module/test-inter}))
+  (load-application! _test-application-path))
 
-(defn load-single-app-mods
-  [app-content]
-  (as-> app-content it
-    (get it :modules)
-    (for [elem it] (apply load-single-mod (conj elem :cache)))))
-
-(comment
-  (load-single-app-mods
-    '{:modules {"test/system/hello_world/testing-module.clj"
-                  {:another dummy-wolth-module/test-inter-w-args,
-                   :test-intercep dummy-wolth-module/test-inter}}}))
-
-(defn load-everything
-  [app-paths]
-  (->> app-paths
-       (fh/expand-app-paths)
-       (map #(.getPath %))
-       ;;  (map create-routes-for-one-application)
-  ))
-
-
-(defn load-files-and-modules
-  [app-paths]
-  (let [app-content (->> app-paths
-                         (fh/expand-app-paths)
-                         (map #(.getPath %))
-                         (map load-single-app-file))]
-    (doall (map identity app-content))
-    app-content))
+; tutaj odpalam spec
+(defn test-application-file!
+  [app-path]
+  (let [file-obj (io/file app-path)]
+    (cond
+      (not (.exists file-obj))
+        (throw-loader-exception (format "Could not find the file: %s" app-path))
+      (not (.canRead file-obj))
+        (throw-loader-exception
+          (format
+            "Could not load file: %s because current user has no read permission"
+            app-path)))
+    (test-app-structure (slurp file-obj)))
+  (log/info ::test-application-file!
+            (format "File %s loaded without errors" app-path)))
 
 (comment
-  (load-files-and-modules '("test/system/person/_person.app.edn")))
+  (test-application-file! _test-application-path)
+  (test-application-file! "dasdnsjadkjsan")
+  (test-application-file! "logs/tfile.txt"))
+
+(defn load-user-functionalities
+  [app-data]
+  (-> app-data
+      (update-in [:objects] #(conj % user/user-table user/token-table))
+      (update-in [:serializers]
+                 #(conj % user/user-admin-view user/user-regular-view))))
+
+(comment
+  (clojure.pprint/pprint (load-user-functionalities _test-app-data)))
+
+(defn store-applications!
+  [app-names app-datas]
+  (let [app-tuples (zipmap app-names app-datas)]
+    (reset! app-data-container app-tuples)
+    (log/info ::store-applications!
+              (format "Stored app config for the applications: %s"
+                      (str/join ", " app-names)))))
+
+(comment
+  (store-applications! '("test-app") (list _test-app-data))
+  (deref app-data-container))
+
+
+(defn store-db-connections!
+  [app-names app-datas]
+  (let [cursors (zipmap app-names
+                        (map #(get-datasource (get % :persistent-db))
+                          app-datas))]
+    (reset! cursor-pool cursors)
+    (log/info ::store-db-connections!
+              (format "Stored connections for the applications: %s"
+                      (str/join ", " app-names)))))
+
+(comment
+  (store-db-connections! '("test-app1") (list _test-app-data))
+  (deref cursor-pool))
+
+
+(defn store-routes! [routes])
+
+(defn create-sql-tables!
+  [app-names applications]
+  (let [table-sql (map (fn [x] (generate-create-table-sql (get x :objects)))
+                    applications)]
+    (run! (fn [[app-name tables]]
+            (run! (partial execute-sql-expr! app-name) tables))
+          (zipmap app-names table-sql))))
+
+(comment
+  (create-sql-tables! '("test-app1") (list _test-app-data)))
+
+(defn admin-account-exists?
+  [app-name admin-name]
+  (some? (seq (execute-sql-expr! app-name
+                                 ["SELECT 1 FROM User WHERE USERNAME = ?;"
+                                  admin-name]))))
+
+(comment
+  (admin-account-exists? "person" "myAdmin")
+  (admin-account-exists? "person" "admin ktory nie istnieje"))
+
+(defn create-admin-account!
+  [app-name app-data]
+  (assert (string? app-name))
+  (assert (map? app-data))
+  (let [admin-cred (get-in app-data [:meta :admin])
+        admin-name (get admin-cred :name)]
+    (if (admin-account-exists? app-name admin-name)
+      (log/info
+        ::create-admin-account!
+        (format
+          "Admin with name: %s already exists. Skipping this step for app: %s"
+          admin-name
+          app-name))
+      (let
+        [hashed-admin-pass (create-password-hash (get admin-cred :password))
+         generated-id (create-uuid)
+         sql-expr
+           ["INSERT INTO User (USERNAME, PASSWORD, ROLE, ID) VALUES (?, ?, ?, ?);"
+            admin-name hashed-admin-pass "admin" generated-id]]
+        (execute-sql-expr! app-name sql-expr)
+        (log/info
+          ::create-admin-account!
+          (format
+            "Application %s did not had the admin account set. Creating one for the %s app"
+            admin-name
+            app-name))))))
+
+(comment
+  (create-admin-account! "person" _test-app-data)
+  (execute-sql-expr! "person"
+                     ["DELETE FROM User WHERE USERNAME = ?" "myAdmin"]))
