@@ -1,4 +1,5 @@
-{:objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
+{:meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
+ :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
                      {:name "note", :type :text}],
             :name "Person",
             :options [:uuid-identifier]}
@@ -9,6 +10,7 @@
                          :ref-type :o2m,
                          :references "Person",
                          :related-name "posts"}]}],
+ :persistent-db {:dbname "mydatabase", :dbtype "h2"},
  :serializers
    [{:allowed-roles ["admin"],
      :name "public",
