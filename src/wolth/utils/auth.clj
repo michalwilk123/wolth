@@ -1,6 +1,7 @@
 (ns wolth.utils.auth
   (:require
     [wolth.db.user :refer [fetch-user-data save-auth-token]]
+    [io.pedestal.log :as log]
     [wolth.utils.crypto :as crypto]
     [wolth.server.utils :as server-utils]
     [wolth.server.config :refer [def-context cursor-pool app-data-container]]
@@ -191,11 +192,13 @@
       "person"))
 
 (def-interceptor-fn
-  token-request
+  token-login-request
   [ctx]
   (let [body-params (select-keys (get-in ctx [:request :json-params])
                                  [:username :password])
         app-name (ctx :app-name)]
+    (assert (= 2 (count body-params)))
+    (log/info ::token-request (str "PROVIDED DATA: " body-params))
     (if-let [user-data (fetch-user-data (body-params :username) app-name)]
       (if (or (println (body-params :password) (user-data :password))
               (crypto/verify-password (body-params :password)
@@ -209,10 +212,15 @@
       (throw-wolth-exception :404 "Cannot find this user in the database"))))
 
 (comment
-  (token-request _test-request-map))
+  (token-login-request _test-request-map))
 
-(def token-auth-req-interceptor
-  {:name ::TOKEN-WOLTH-INTERCEPTOR, :enter token-request})
+(def token-auth-login-interceptor
+  {:name ::TOKEN-LOGIN-WOLTH-INTERCEPTOR, :enter token-login-request})
+
+(def-interceptor-fn token-logout-request [ctx] ctx)
+
+(def token-auth-login-interceptor
+  {:name ::TOKEN-LOGOUT-WOLTH-INTERCEPTOR, :enter token-logout-request})
 
 #_"
   If user has invalid header, bad password, bad username then
@@ -316,5 +324,8 @@
 (comment
   (_test-context '(authorize-user _test_authenticated_ctx)))
 
-(def authorizer-interceptor
+(def model-authorizer-interceptor
+  {:name ::AUTHORIZER-INTERCEPTOR, :enter authorize-user})
+
+(def function-authorizer-interceptor
   {:name ::AUTHORIZER-INTERCEPTOR, :enter authorize-user})

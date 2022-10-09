@@ -1,5 +1,7 @@
 (ns wolth.utils.common
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [io.pedestal.log :as log]))
+
 
 (def field-lut
   {:char "VARCHAR(1)",
@@ -94,6 +96,7 @@
 
 (defn sql-map->map
   [nmap]
+  (log/info ::sql-map->map nmap)
   (into {}
         (map (fn [[k val]]
                [(-> k

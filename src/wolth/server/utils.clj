@@ -45,7 +45,6 @@
 
 (defn uri->parsed-info
   [uri method]
-  (log/info ::uri->parsed-info (str "WARTOSC: " uri))
   (let [splitted-names (str/split uri #"/")
         app-name (second splitted-names)
         serializer-name (last splitted-names)

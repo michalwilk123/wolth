@@ -6,9 +6,6 @@
            [javax.crypto.spec SecretKeySpec]
            [java.security MessageDigest]))
 
-;; (defn string->b64 [in-text] (.encodeToString (.withoutPadding
-;; (Base64/getUrlEncoder)) in-text))
-
 (defn bytes->b64
   [bin-data]
   (.encodeToString (.withoutPadding (Base64/getUrlEncoder)) bin-data))
@@ -63,6 +60,8 @@
 
 (defn verify-password
   [cand-password password]
+  (assert (some? cand-password))
+  (assert (some? password))
   (verify-with :argon2 cand-password password))
 
 (comment

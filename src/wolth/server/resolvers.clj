@@ -47,14 +47,18 @@
 (def-interceptor-fn
   resolve-model-query
   [ctx]
+  (log/info ::resolve-model-query (select-keys ctx [:sql-query]))
   (if-not (contains? ctx :sql-query)
     (throw-wolth-exception :500 "No SQL query found in context!")
     (let [query (ctx :sql-query)
           result (execute-sql-expr! (get ctx :app-name) query)]
-      (as-> ctx it (dissoc it :sql-query) (assoc it :result (str result))))))
+      (as-> ctx it (dissoc it :sql-query) (assoc it :result result)))))
 
 (comment
   (_test-context '(resolve-model-query _test_serializer_data)))
 
 (def model-resolver-interceptor
+  {:name ::MODEL-RESOLVER-INTERCEPTOR, :enter resolve-model-query})
+
+(def function-resolver-interceptor
   {:name ::MODEL-RESOLVER-INTERCEPTOR, :enter resolve-model-query})
