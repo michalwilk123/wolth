@@ -11,7 +11,7 @@
    :fields [{:constraints [:not-null :unique], :name "username", :type :str128}
             {:constraints [:not-null], :name "password", :type :password}
             {:constraints [:not-null], :name "role", :type :str128}
-            {:constraints [:unique], :name "email", :type :str128}],
+            {:name "email", :type :str128}],
    :options [:uuid-identifier]})
 
 ; this table could be implemented fully in h2. Does not need any persistance /
@@ -52,15 +52,17 @@
 
 (defn fetch-user-data
   [username app-name]
-  (->> {:select :*, :from [:User], :where [:= :User.username username]}
-       (sql/format)
-       (execute-sql-expr! app-name)
-       (first)
-       (sql-map->map)))
+  (let [fetched
+          (->> {:select :*, :from [:User], :where [:= :User.username username]}
+               (sql/format)
+               (execute-sql-expr! app-name)
+               (first)
+               (sql-map->map))]
+    (if-not (empty? fetched) fetched nil)))
 
 (comment
-  (fetch-user-data "myAdmin" "person"))
-
+  (fetch-user-data "myAdmin" "person")
+  (fetch-user-data "myAdmina" "person"))
 
 
 (comment
@@ -76,4 +78,5 @@
 
 (comment
   (save-auth-token "90692522-3c84-4fe4-9fcd-25b7ebaf828d" "TOKEN" "person")
-  (execute-sql-expr! "person" ["DELETE FROM Token;"]))
+  (execute-sql-expr! "person" ["DELETE FROM Token;"])
+  (execute-sql-expr! "person" ["SELECT * FROM User;"]))
