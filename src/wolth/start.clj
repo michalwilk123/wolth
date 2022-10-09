@@ -3,6 +3,7 @@
   (:require [io.pedestal.http :as http] ;; <2>
             [io.pedestal.http.route :as route]
             [wolth.server.utils :refer [app-path->app-name]]
+            [wolth.server.config :refer [wolth-routes]]
             [wolth.utils.loader :refer
              [load-application! test-application-file! load-user-functionalities
               store-applications! store-db-connections! store-routes!
@@ -20,7 +21,9 @@
    ::http/join? false,
    ::http/type :jetty,
    ::http/port 8002,
-   ::http/routes (fn [] (deref #'r/route-table)),
+   ::http/router :linear-search,
+   ;;  ::http/routes (fn [] (deref #'r/route-table)),
+   ::http/routes (fn [] (deref wolth-routes)),
    ::http/resource-path "/public",
    ::http/container-options {:h2c? true, :h2? false, :ssl? false},
    ::http/allowed-origins {:creds true, :allowed-origins (constantly true)},
@@ -35,25 +38,28 @@
 
 (defn stop-server [] (http/stop @server-instance))
 
-(defn -main
+(defn configure-wolth
   [& app-paths]
   (run! test-application-file! app-paths)
   (let [applications (->> app-paths
                           (map load-application!)
                           (map load-user-functionalities))
         app-names (map app-path->app-name app-paths)
-        generated-routes (r/generate-full-routes app-names applications)]
+        generated-routes (r/generate-routes app-names applications)]
     (store-applications! app-names applications)
     (store-db-connections! app-names applications)
     (create-sql-tables! app-names applications)
-    (map (partial apply create-admin-account!) (zipmap app-names applications))
-    ;; (store-routes! generated-routes)
+    (run! (partial apply create-admin-account!) (zipmap app-names applications))
+    (reset! wolth-routes generated-routes)
+    ;; (reset! wolth-routes r/route-table)
   ))
 
 (def _test-application-path "test/system/person/person.app.edn")
 
 (comment
-  (-main _test-application-path))
+  (configure-wolth _test-application-path))
+
+(defn -main [& app-paths] (configure-wolth app-paths))
 
 (comment
   (create-server)

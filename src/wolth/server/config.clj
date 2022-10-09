@@ -5,9 +5,7 @@
 
 (def app-data-container (atom nil))
 
-(defonce routes (atom nil))
-
-(defonce function-bank (atom nil))
+(def wolth-routes (atom nil))
 
 (defonce _test_atom_1 (atom 1))
 (defonce _test_atom_2 (atom 2))

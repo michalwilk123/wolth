@@ -4,7 +4,7 @@
             [wolth.utils.auth :as auth]
             [io.pedestal.log :as log]
             [wolth.server.serializers :as serializers]
-            [wolth.server.views :refer [view-interceptor]]
+            [wolth.server.views :refer [model-view-interceptor]]
             [io.pedestal.interceptor :refer [interceptor]]
             [wolth.server.utils :refer [utility-interceptor]]
             [io.pedestal.http.body-params :as body-params]
@@ -15,40 +15,16 @@
 
 
 
-;; (def routes #{["/greet" :get respond-hello :route-name :greet]})
-
-;; (def routes [[:hello-world :http
-;;               ["/order" {:get 'resp-or}
-;;                ["/:id" {:get 'respond-hello}]]]])
-
 (def routes '[[:hello ["/hello-world" {:get hello-world}]]])
 
 (defn hello-world [req] {:status 200, :body "EJSDNJDSANK Worlddjdjd"})
 
 (defn example [req] {:status 200, :body "JESTEM ENDPOINTEM"})
 
-;; (defhandler hello
-;;             [req]
-;;             {:status 200, :body (str "HNALDER!!" (req :path-params))})
-
 (defn hello
   [ctx]
   (log/error :BBBB "NIE ODPALA SIE")
   {:status 200, :body (str "AAAAA" ctx)})
-
-;; IMPORTANT! Expand route must be outside the init function
-;; (def route-table
-;;   (route/expand-routes [[:hello
-;;                          ["/app" {:get 'example}
-;;                           ["/:query" {:get
-;;                           'requests/build-read-request}]]]]))
-
-;; (defn utility-interceptor-fn [ctx]
-;;   (log/info :EEE " ODPALA SIE")
-;;   (log/info :OOO ctx)
-;;   (assoc ctx :response {:body (str "twoja stara smazy sul: " ctx) :status
-;;   200})
-;;   )
 
 (def ii
   {:name ::DSAKDNS,
@@ -59,55 +35,168 @@
                  :body (str "TESTING MESSAGE  "
                             (select-keys x [:exception-occured :response]))}))})
 
+(defn test-resp [ctx] {:status 200, :body "OK"})
+
+;; (def route-table
+;;   (route/expand-routes #{["/app/User/id/user-admin" :get
+;;                           'test-resp
+;;                           :route-name :czytanie-zwyklego-usera]
+;;                          ["/app/User/user-regular" :post
+;;                           'test-resp
+;;                           :route-name :tworzenie-zwyklego-usera]}))
+
 
 (def route-table
   (route/expand-routes
     #{["/app/Person/:Person_query" :get 'requests/build-read-request :route-name
        :nazwa-routa]
-      ;; ["/app/Person/:Person_query/admin" :get 'requests/build-read-request
-      ;;  :route-name :nazwa-routa-num2]
+      ["/app/Person/:Person_query/admin" :get 'requests/build-read-request
+       :route-name :nazwa-routa-num2]
       ["/person/auth" :post
        [(body-params/body-params) http/json-body utility-interceptor
-        auth/token-auth-req-interceptor] :route-name :app-token-request]
+        auth/token-auth-login-interceptor] :route-name :app-token-request]
       ["/app/Person/:Person_query/User/:User_query/admin" :get
        requests/build-read-request :route-name :nazwa-routa-num3]
       ["/person/Person/public" :post
        [(body-params/body-params) http/json-body utility-interceptor
-        auth/authenticator-interceptor auth/authorizer-interceptor
-        view-interceptor] :route-name :nazwa-posta-routa]
+        auth/authenticator-interceptor auth/model-authorizer-interceptor
+        model-view-interceptor] :route-name :nazwa-posta-routa]
+      ["/person/User/:id/user-admin" :get
+       [(body-params/body-params) http/json-body utility-interceptor
+        auth/authenticator-interceptor auth/model-authorizer-interceptor
+        serializers/model-serializer-interceptor model-resolver-interceptor
+        model-view-interceptor] :route-name :czytanie-zwyklego-usera]
       ["/person/User/user-regular" :post
        [(body-params/body-params) http/json-body utility-interceptor
-        auth/authenticator-interceptor auth/authorizer-interceptor
-        serializers/model-serializer-interceptor model-resolver-interceptor
-        view-interceptor] :route-name :tworzenie-zwyklego-usera]
-      ["/person/User/:user-query/user-admin/" :get
-       [(body-params/body-params) http/json-body utility-interceptor
-        auth/authenticator-interceptor auth/authorizer-interceptor
-        serializers/model-serializer-interceptor view-interceptor] :route-name
-       :czytanie-zwyklego-usera]
+        auth/authenticator-interceptor auth/model-authorizer-interceptor
+        serializers/model-serializer-interceptor ii] :route-name
+       :tworzenie-zwyklego-usera]
       ["/app2/Person" :post
        [(body-params/body-params) 'http/json-body
         'serializers/model-serializer-interceptor
         'requests/build-create-request] :route-name :nazwa-test-posta-routa]}))
 
 
-(comment
-  route-table)
+(def url-for (route/url-for-routes route-table))
 
 (comment
-  (sql/format (hsql/create-table :foo :if-not-exists)))
+  (first (clojure.pprint/pprint route-table))
+  (url-for :czytanie-zwyklego-usera {:hehe 2222})
+  (url-for :tworzenie-zwyklego-usera))
 
-(defn generate-routes-for-single-app [app-name])
+(def ^:private _test-app-data
+  {:functions [{:funcName "timeSince",
+                :name "daysSince",
+                :allowed-roles true,
+                :type :java}
+               {:funcName "nPrimes2",
+                :name "primes",
+                :path "clojureFunction",
+                :allowed-roles ["admin"],
+                :type :clojure}],
+   :serializers [{:name "public",
+                  :operations [{:create {:attached [["note" "Testowa notatka"]],
+                                         :fields ["name"]},
+                                :delete true,
+                                :model "Person",
+                                :read {:attached [],
+                                       :fields ["name" "note" "id"]},
+                                :update {:fields ["name"]}}]}]})
 
-; TODO: Dokonczyc!!
-(defn generate-full-routes
+(defn generate-routes-for-serializer-operation
+  [app-name serializer-name serializer-operation & [related-models]]
+  (let [model-name (get serializer-operation :model)
+        base-uri (format "/%s/%s" app-name model-name)
+        detail-uri (str base-uri "/:id/" serializer-name)
+        selector-param (format ":%s-query" model-name)
+        select-uri (str base-uri (str "/" selector-param "/") serializer-name)
+        create-uri (str base-uri "/" serializer-name)
+        route-name (format "%s-%s-%s-" app-name serializer-name model-name)
+        interceptors [(body-params/body-params) http/json-body
+                      utility-interceptor auth/authenticator-interceptor
+                      auth/model-authorizer-interceptor
+                      serializers/model-serializer-interceptor
+                      model-resolver-interceptor model-view-interceptor]]
+    (cond-> (list)
+      (get serializer-operation :read)
+        (conj [select-uri :get interceptors :route-name
+               (keyword (str route-name "-get"))])
+      (get serializer-operation :create)
+        (conj [create-uri :post interceptors :route-name
+               (keyword (str route-name "-post"))])
+      (get serializer-operation :update)
+        (conj [detail-uri :patch interceptors :route-name
+               (keyword (str route-name "-patch"))])
+      (get serializer-operation :delete)
+        (conj [detail-uri :delete interceptors :route-name
+               (keyword (str route-name "-delete"))]))))
+
+(comment
+  (generate-routes-for-serializer-operation
+    "person"
+    "public"
+    {:create {:attached [["note" "Testowa notatka"]], :fields ["name"]},
+     :delete true,
+     :model "Person",
+     :read {:attached [], :fields ["name" "note" "id"]},
+     :update {:fields ["name"]}})
+  (generate-routes-for-serializer-operation
+    "person"
+    "public"
+    {:delete true,
+     :model "Person",
+     :read {:attached [], :fields ["name" "note" "id"]},
+     :update {:fields ["name"]}}))
+
+(defn generate-routes-for-serializer
+  [app-name serializer]
+  (apply concat
+    (map (partial generate-routes-for-serializer-operation
+                  app-name
+                  (get serializer :name))
+      (get serializer :operations))))
+
+(comment
+  (generate-routes-for-serializer
+    "person"
+    {:allowed-roles ["admin"],
+     :name "public",
+     :operations [{:update {:fields ["username"]}, :model "User"}
+                  {:delete true,
+                   :model "Person",
+                   :read {:attached [], :fields ["name" "note" "id"]},
+                   :update {:fields ["name"]}}]})
+  (generate-routes-for-serializer "person"
+                                  (get-in _test-app-data [:serializers 0])))
+
+(defn generate-routes-for-functions [app-name functions] (list))
+
+(defn generate-routes-for-app
+  [app-name app-data]
+  (let [auth-uri (format "/%s/auth" app-name)]
+    (concat (apply concat
+              (map (partial generate-routes-for-serializer app-name)
+                (get app-data :serializers)))
+            (list [auth-uri :post
+                   [(body-params/body-params) http/json-body utility-interceptor
+                    auth/token-auth-login-interceptor] :route-name
+                   (keyword (str app-name "-token-auth-request"))])
+            (apply concat
+              (map (partial generate-routes-for-functions app-name)
+                (get app-data :functions))))))
+
+(comment
+  (generate-routes-for-app "test-app" _test-app-data))
+
+(defn generate-routes
   [app-names app-datas]
   (assert (seq? app-names))
   (assert (seq? app-datas))
-  (assert (= (count app-datas) (count app-datas)))
-  nil)
+  (->> (zipmap app-names app-datas)
+       (map (partial apply generate-routes-for-app))
+       (apply concat)
+       (set)
+       (route/expand-routes)))
 
 (comment
-  generate-full-routes
-  (list)
-  (list))
+  (generate-routes (list "test-app") (list _test-app-data)))
