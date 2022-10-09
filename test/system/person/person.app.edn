@@ -1,4 +1,16 @@
-{:meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
+{:functions [{:allowed-roles true,
+              :args [["days" :int] ["months" :int] ["years" :int]],
+              :funcName "timeSince",
+              :name "daysSince",
+              :path "TestFunc",
+              :type :java}
+             {:allowed-roles ["admin"],
+              :args [["num" :int]],
+              :funcName "nPrimes2",
+              :name "primes",
+              :path "clojureFunction",
+              :type :clojure}],
+ :meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
  :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
                      {:name "note", :type :text}],
             :name "Person",
