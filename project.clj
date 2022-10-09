@@ -23,6 +23,7 @@
      [cheshire "5.11.0"]
      [cryptohash-clj "0.1.10"]]
   :min-lein-version "2.0.0"
+  :java-source-paths ["functions"]
   :resource-paths ["config" "resources"]
   ;; If you use HTTP/2 or ALPN, use the java-agent to pull in the correct
   ;; alpn-boot dependency
