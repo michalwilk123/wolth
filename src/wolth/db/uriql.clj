@@ -102,6 +102,7 @@
                 "(name<>john$or$(age>=30$and&age<100))"
                 :exact)
   (token-found? fullFilterQueryExpr "name==Adam$and$age>10" :exact)
+  (token-found? fullFilterQueryExpr "name==Adam" :exact)
   (str/replace "name==Adam$and$age>10" fullFilterQueryExpr "QQQ")
   (re-matches #"(?<dsads>(<|>|(<=))+)" "<<<="))
 
@@ -335,14 +336,45 @@
   (multiple-token-found "1111ddd" #"[0-9]+" #"[a-z]+")
   (multiple-token-found "13232132189321" #"[0-9]+" #"[a-z]+"))
 
+(defn attach-optional-filter-query
+  [subquery table-name filter-query]
+  (if filter-query
+    (update-in subquery
+               [:where]
+               (fn [current]
+                 (let [hydrated-query (hydrate-filter-query-w-table-name
+                                        filter-query
+                                        table-name
+                                        :allow-string-fields
+                                        true)]
+                   (cond 
+                     (= ( first current ) :and) (conj current hydrated-query)
+                     (vector? current) (vector :and current hydrated-query)
+                     :else hydrated-query
+                     ))))
+    subquery))
+
+(comment
+  (attach-optional-filter-query {:where [:or [:= :Person.role "regular"]
+                                         [:<> :Person.surname "Kowalski"]]}
+                                "Person"
+                                [:= "owner" "Michał"])
+  (attach-optional-filter-query {:where [:and [:= :Person.role "regular"]
+                                         [:<> :Person.surname "Kowalski"]]}
+                                "Person"
+                                [:= "owner" "Michał"])
+  (attach-optional-filter-query {}
+                                "Person"
+                                [:= "owner" "Michał"])
+  )
 
 (defn build-selector-query
   [table-name selector]
   (assert (and (string? table-name) (string? selector))
           "Both arguments must be a string!")
   (cond-> {}
-    (token-found? detailToken selector :exact) (merge (detail-builder table-name
-                                                                      selector))
+    ;; (token-found? detailToken selector :exact) (merge (detail-builder table-name
+    ;;                                                                   selector))
     (token-found? allToken selector :exact) (identity)
     (token-found? sortExprToken selector :exact) (merge (sort-builder table-name
                                                                       selector))
@@ -354,37 +386,27 @@
 
 (comment
   (build-selector-query "Person" "name==michal")
+  (build-selector-query "Person" "(name==michal$and$id<>123)")
   (token-found? filterQueryCandidateRe "name==michal"))
 
 (defn build-select
   [table-name selector filter-query & [fields]]
-  (let [subquery (merge {:select (or fields :*), :from (keyword table-name)}
-                        (build-selector-query table-name selector))]
-    (if filter-query
-      (update-in subquery
-                 [:where]
-                 (fn [current]
-                   (let [hydrated-query (hydrate-filter-query-w-table-name
-                                          filter-query
-                                          table-name
-                                          :allow-string-fields
-                                          true)]
-                     (if-not current
-                       hydrated-query
-                       (vector :and current hydrated-query)))))
-      subquery)))
+  (-> {:select (or fields :*), :from (keyword table-name)}
+      (merge 
+                        (build-selector-query table-name selector))
+      (attach-optional-filter-query table-name filter-query)))
 
 (comment
-  (build-select "Person" "id=111" nil)
+  (build-select "Person" "id==111" nil)
   (build-select "Person" "(name<>111)" [:= "hidden" false])
-  (build-select "Person" "id=111" [:= "hidden" false])
+  (build-select "Person" "id==111" [:= "hidden" false])
   (build-select "Person" "<<name>>age" nil)
   (build-select "Person" "<<name" nil)
   (build-select "Person" "<<name" [:= "id" 997])
   (build-select "Person" "*" nil)
   (build-select "User" "*" nil (list :author :content :id))
   (build-select "Person" "<<name(name<>admin)" nil)
-  (build-select "Person" "name==Adam$and$age>10" nil))
+  (build-select "Person" "(name==Adam$and$age>10)" nil))
 
 (defn build-update
   [table-name selector values filter-query]
