@@ -1,4 +1,4 @@
-(ns wolth.db.query
+(ns wolth.db.uriql
   (:require [clojure.string :as str]
             clojure.walk
             [honey.sql.helpers :as h]))
@@ -353,10 +353,8 @@
              (filter-builder table-name selector))))
 
 (comment
-  (build-selector-query "Person" "name==michal"
-   )
-   (token-found? filterQueryCandidateRe "name==michal")
-  )
+  (build-selector-query "Person" "name==michal")
+  (token-found? filterQueryCandidateRe "name==michal"))
 
 (defn build-select
   [table-name selector filter-query & [fields]]
