@@ -86,7 +86,7 @@
   (re-pattern
     (str/join "|" [filterExprToken filterDelimiterToken filterTerminalToken])))
 
-(def-token fullFIlterQueryExpr
+(def-token fullFilterQueryExpr
            open-bracket
            filterQueryCandidateRe
            close-bracket
@@ -94,15 +94,15 @@
 
 (comment
   (filterQueryCandidateRe)
-  (fullFIlterQueryExpr)
+  (fullFilterQueryExpr)
   (re-seq filterQueryCandidateRe "dsadsa==1$or$ccc<=21")
   (token-found? filterQueryCandidateRe "name==john")
   (token-found? filterQueryCandidateRe "(name==john$and$age>20)" :exact)
   (token-found? filterQueryCandidateRe
                 "(name<>john$or$(age>=30$and&age<100))"
                 :exact)
-  (token-found? fullFIlterQueryExpr "name==Adam$and$age>10" :exact)
-  (str/replace "name==Adam$and$age>10" fullFIlterQueryExpr "QQQ")
+  (token-found? fullFilterQueryExpr "name==Adam$and$age>10" :exact)
+  (str/replace "name==Adam$and$age>10" fullFilterQueryExpr "QQQ")
   (re-matches #"(?<dsads>(<|>|(<=))+)" "<<<="))
 
 
@@ -238,19 +238,27 @@
     (first @p-stack)))
 
 (defn hydrate-filter-query-w-table-name
-  [query table-name]
+  [query table-name & {:keys [allow-string-fields]}]
   (let [field (second query)]
-    (if (keyword? field)
+    (if (or (keyword? field) allow-string-fields)
       (assoc query 1 (keyword (str table-name "." (name field))))
       (into []
             (map (fn [x]
                    (if (vector? x)
-                     (hydrate-filter-query-w-table-name x table-name)
+                     (hydrate-filter-query-w-table-name x
+                                                        table-name
+                                                        :allow-string-fields
+                                                        allow-string-fields)
                      x))
               query)))))
 
 (comment
   (hydrate-filter-query-w-table-name [:= :name "Adam"] "Person")
+  (hydrate-filter-query-w-table-name [:= "id" "Adam"]
+                                     "Person"
+                                     :allow-string-fields
+                                     true)
+  (hydrate-filter-query-w-table-name [:= "name" "Adam"] "Person")
   (hydrate-filter-query-w-table-name [:or [:> :age 20] [:= :name "Adam"]]
                                      "Person"))
 
@@ -328,47 +336,97 @@
   (multiple-token-found "13232132189321" #"[0-9]+" #"[a-z]+"))
 
 
-(defn build-subquery
-  [initial-map table-name selector]
+(defn build-selector-query
+  [table-name selector]
   (assert (and (string? table-name) (string? selector))
           "Both arguments must be a string!")
-  (assert map? initial-map)
-  (cond-> initial-map
+  (cond-> {}
     (token-found? detailToken selector :exact) (merge (detail-builder table-name
                                                                       selector))
     (token-found? allToken selector :exact) (identity)
     (token-found? sortExprToken selector :exact) (merge (sort-builder table-name
                                                                       selector))
-    (token-found? fullFIlterQueryExpr selector :exact)
+    (token-found? filterQueryCandidateRe selector :exact)
       (merge (filter-builder table-name selector))
     (multiple-token-found selector sortToken filterQueryCandidateRe)
       (merge (sort-builder table-name selector)
              (filter-builder table-name selector))))
 
+(comment
+  (build-selector-query "Person" "name==michal"
+   )
+   (token-found? filterQueryCandidateRe "name==michal")
+  )
 
 (defn build-select
-  [table-name selector & [fields]]
-  (build-subquery {:select (or fields :*), :from (keyword table-name)}
-                  table-name
-                  selector))
+  [table-name selector filter-query & [fields]]
+  (let [subquery (merge {:select (or fields :*), :from (keyword table-name)}
+                        (build-selector-query table-name selector))]
+    (if filter-query
+      (update-in subquery
+                 [:where]
+                 (fn [current]
+                   (let [hydrated-query (hydrate-filter-query-w-table-name
+                                          filter-query
+                                          table-name
+                                          :allow-string-fields
+                                          true)]
+                     (if-not current
+                       hydrated-query
+                       (vector :and current hydrated-query)))))
+      subquery)))
 
 (comment
-  (build-select "person" "id=111")
-  (build-select "person" "<<name>>age")
-  (build-select "person" "<<name")
-  (build-select "person" "*")
-  (build-select "User" "*" (list :author :content :id))
-  (build-select "person" "<<name(name<>admin)")
-  (build-select "person" "name==Adam$and$age>10"))
+  (build-select "Person" "id=111" nil)
+  (build-select "Person" "(name<>111)" [:= "hidden" false])
+  (build-select "Person" "id=111" [:= "hidden" false])
+  (build-select "Person" "<<name>>age" nil)
+  (build-select "Person" "<<name" nil)
+  (build-select "Person" "<<name" [:= "id" 997])
+  (build-select "Person" "*" nil)
+  (build-select "User" "*" nil (list :author :content :id))
+  (build-select "Person" "<<name(name<>admin)" nil)
+  (build-select "Person" "name==Adam$and$age>10" nil))
+
+(defn build-update
+  [table-name selector values filter-query]
+  (let [subquery (merge {:update (keyword table-name), :set values}
+                        (build-selector-query table-name selector))]
+    (if filter-query
+      (update-in subquery
+                 [:where]
+                 (fn [current]
+                   (let [hydrated-query (hydrate-filter-query-w-table-name
+                                          filter-query
+                                          table-name
+                                          :allow-string-fields
+                                          true)]
+                     (if-not current
+                       hydrated-query
+                       (vector :and current hydrated-query)))))
+      subquery)))
+
+(comment
+  (build-update "person"
+                "name==admin"
+                {:name "nowa nazwa", :email "nowy@mail.pl"}
+                nil)
+  (build-update "person"
+                "*"
+                {:name "nowa nazwa", :email "nowy@mail.pl"}
+                [:= "id" 112]))
 
 (defn merge-select-hsql [queries] (first queries))
 
-(defn build-delete
-  [table-name selector]
-  (build-subquery {:delete :*, :from (keyword table-name)} table-name selector))
 
-(comment
-  (build-delete "person" "id=111"))
+
+;; (defn build-delete
+;;   [table-name selector]
+;;   (build-subquery {:delete :*, :from (keyword table-name)} table-name
+;;   selector))
+
+;; (comment
+;;   (build-delete "person" "id=111"))
 
 
 (defn build-query-from-url
@@ -379,7 +437,7 @@
        (remove str/blank?)
        (create-pairs)
        (check-if-joining-valid)
-       (map (partial apply build-subquery))
+       (map (partial apply build-selector-query))
        ;;  (merge-sql-subqueries)
   ))
 
