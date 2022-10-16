@@ -1,14 +1,8 @@
-{:functions [{:allowed-roles true,
-              :args [["days" :int] ["months" :int] ["years" :int]],
-              :funcName "timeSince",
-              :name "daysSince",
-              :path "TestFunc",
-              :type :java}
-             {:allowed-roles ["admin"],
+{:functions [{:allowed-roles ["admin"],
               :args [["num" :int]],
-              :funcName "nPrimes2",
+              :function-name "nPrimes2",
               :name "primes",
-              :path "clojureFunction",
+              :path "clojureFunction.clj",
               :type :clojure}],
  :meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
  :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
@@ -26,9 +20,9 @@
  :serializers
    [{:allowed-roles ["admin"],
      :name "public",
-     :operations [{:create
-                     {:attached [["note" "Testowa notatka"]], :fields ["name"]},
-                   :delete true,
-                   :model "Person",
-                   :read {:attached [], :fields ["name" "note" "id"]},
-                   :update {:fields ["name"]}}]}]}
+     :operations
+       [{:create {:attached [["note" "Testowa notatka"]], :fields ["name"]},
+         :delete true,
+         :model "Person",
+         :read {:fields ["name" "note" "id"], :filter [:= "author" :user-id]},
+         :update {:fields ["name"]}}]}]}
