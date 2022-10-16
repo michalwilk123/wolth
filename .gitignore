@@ -35,6 +35,7 @@ repl-port
 # Builds
 out/
 build/
+*.db
 
 # Python
 .venv
