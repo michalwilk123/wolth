@@ -1,7 +1,7 @@
 
 
 ; source: https://gist.github.com/Sdaas/288f4679204d0f5cbcf6
-(defn isPrime?
+(defn- isPrime?
   "returns true if the input number is a prime number, false otherwise"
   [n]
   (let [divisors (range 2 (inc (int (Math/sqrt n))))
