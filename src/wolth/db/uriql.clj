@@ -1,8 +1,9 @@
 (ns wolth.db.uriql
   (:require [clojure.string :as str]
             clojure.walk
-            [wolth.utils.common :refer [get-first-matching-pred]]
-            [honey.sql.helpers :as h]))
+            [honey.sql.helpers :as h]
+            [wolth.server.exceptions :refer [throw-wolth-exception]]
+            [wolth.utils.common :refer [get-first-matching-pred]]))
 
 
 (def open-bracket "(")
@@ -70,7 +71,7 @@
   (fullFilterQueryExpr)
   (re-seq filterQueryCandidateRe "dsadsa==1$or$ccc<=21")
   (token-found? fullFilterQueryExpr "name==Adam$and$age>10" :exact)
-  (token-found? fullFilterQueryExpr "name==Adam$and$surname<>kowalski" :exact)
+  (token-found? fullFilterQueryExpr "(name==Adam$and$surname<>kowalski)" :exact)
   (token-found? fullFilterQueryExpr "name==Adam" :exact)
   (token-found? fullFilterQueryExpr "<<name" :exact)
   (str/replace "name==Adam$and$age>10" fullFilterQueryExpr "QQQ")
@@ -354,20 +355,22 @@
             (sort-builder table-name selector)))
      (filter-parser []
        (and filter-clause
-            (token-found? filterQueryCandidateRe selector :exact)
+            (token-found? fullFilterQueryExpr selector :exact)
             (filter-builder table-name selector)))
      (syntax-error []
-       (throw (RuntimeException.
-                (format "Uriql syntax error. Unknown syntax: %s" selector))))]
+       (throw-wolth-exception :400
+                              (format "Uriql syntax error. Unknown input: %s"
+                                      selector)))]
     (get-first-matching-pred [all-clause-parser sort-and-filter-parser
                               sort-parser filter-parser syntax-error])))
 
 (comment
   (build-selector-query "Person" "name==michal")
+  (build-selector-query "Person" "(name==michal$and$surname<>kowalski)")
+  (build-selector-query "Person" "(name==Adam$and$surname<>kowalski)")
   (build-selector-query "Person" "*")
   (build-selector-query "Person" "<<name(name==michal$and$id<>123)")
-  (build-selector-query "Person" "<<name>>surname")
-  )
+  (build-selector-query "Person" "<<name>>surname"))
 
 (defn build-select
   [table-name selector filter-query & [fields]]
@@ -389,27 +392,31 @@
   (build-select "Person" "(name==Adam$and$age>10)" nil))
 
 (defn build-update
-  [table-name selector values filter-query]
-  (-> {:update (keyword table-name), :set values}
+  [table-name selector filter-query]
+  (-> {:update (keyword table-name)}
       (merge (build-selector-query table-name selector :sort-clause false))
       (attach-optional-filter-query table-name filter-query)))
 
 (comment
-  (build-update "person"
-                "name==admin"
-                {:name "nowa nazwa", :email "nowy@mail.pl"}
-                nil)
-  (build-update "person"
+  (build-update "person" "name==admin" nil)
+  (build-update "person" ; should throw syntax error because sorts are not
+                         ; permitted
                 "<<createdAt"
-                {:name "nowa nazwa", :email "nowy@mail.pl"}
                 [:= "id" 112])
-  (build-update "person"
-                "*"
-                {:name "nowa nazwa", :email "nowy@mail.pl"}
-                [:= "id" 112]))
+  (build-update "person" "*" [:= "id" 112]))
 
+
+#_"Below functions will be crutial for implementing dynamic joins.
+   For now i left them not completed"
 (defn merge-select-hsql [queries] (first queries))
 
+(defn merge-update-hsql
+  [queries set-vals]
+  (assoc (first queries) :set set-vals))
+
+(comment
+  (merge-update-hsql (list (build-update "person" "*" [:= "id" 112]))
+                     {:email "nowy@mail.com"}))
 
 
 (defn build-delete
