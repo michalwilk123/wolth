@@ -119,3 +119,9 @@
 
 (comment
   (zip (range 10) (repeat 10 "AAA")))
+
+(defn get-first-matching-pred [preds] (some (fn [func] (func)) preds))
+
+(comment
+  (get-first-matching-pred [(partial identity false) (partial identity 10)
+                            (partial even? 122)]))

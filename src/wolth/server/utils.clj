@@ -6,9 +6,16 @@
             [wolth.utils.common :as common]
             [io.pedestal.log :as log]))
 
+(def operations-lut
+  {:post :create, :delete :delete, :get :read, :patch :update})
+
 (def _test-app-data
   {:objects
-     [{:name "User",
+     [{:fields [{:constraints [:not-null], :name "name", :type :str32}
+                {:name "note", :type :text}],
+       :name "Person",
+       :options [:uuid-identifier]}
+      {:name "User",
        :fields
          [{:constraints [:not-null :unique], :name "username", :type :str128}
           {:constraints [:not-null], :name "password", :type :password}
@@ -24,7 +31,8 @@
                       :update {:fields ["username" "email"]},
                       :create {:fields ["username" "email" "password"],
                                :attached [["role" "regular"]]},
-                      :delete true}]}]})
+                      :delete true}
+                     {:model "Person", :create {:fields ["note" "name"]}}]}]})
 
 (defn get-associated-app-data!
   [app-name]
@@ -35,12 +43,16 @@
 (comment
   (get-associated-app-data! "app"))
 
+
 (defn get-associated-objects
-  [app-data table-names]
-  (filter #(.contains table-names (% :name)) (app-data :objects)))
+  [app-data-objects table-names]
+  (map (fn [tab-name]
+         (first (filter #(= (get % :name) tab-name) app-data-objects)))
+    table-names))
 
 (comment
-  (get-associated-objects _test-app-data (list "User")))
+  (get-associated-objects (_test-app-data :objects) (list "User" "Person"))
+  (get-associated-objects (_test-app-data :objects) (list "Person" "User")))
 
 
 (defn uri->parsed-info
@@ -55,13 +67,16 @@
                            (take-nth 2))
                  :post (list (nth splitted-names 2))
                  :delete (list (nth splitted-names 2))
-                 :patch (list (nth splitted-names 2)))]
+                 :patch (list (nth splitted-names 2))
+                 :bank (list (nth splitted-names 2)))]
     [app-name serializer-name tables]))
 
 (comment
   (uri->parsed-info "/app/Person/public" :post)
   (uri->parsed-info "/person/User/user-regular" :post)
-  (uri->parsed-info "/app/Person/firstquery/NextTable/*/public" :get))
+  (uri->parsed-info "/app/Person/firstquery/NextTable/*/public" :get)
+  (uri->parsed-info "/app/getPrimes" :bank)
+  )
 
 (defn uri->app-name [uri] (second (str/split uri #"/")))
 
@@ -89,3 +104,24 @@
 
 (comment
   (app-path->app-name "test/system/person/person.app.edn"))
+
+(defn get-related-serializer-spec
+  [objects serializer-operations method]
+  (as-> objects it
+    (map :name it) ; get object name
+    ; find right serializers
+    (map (fn [tab-name]
+           (common/find-first #(= tab-name (:model %)) serializer-operations))
+      it)
+    ; assign appropriate operation method
+    (map (operations-lut method) it)))
+
+(comment
+  (get-related-serializer-spec
+    (get-associated-objects (_test-app-data :objects) (list "User" "Person"))
+    (get-in _test-app-data [:serializers 0 :operations])
+    :post)
+  (get-related-serializer-spec
+    (get-associated-objects (_test-app-data :objects) (list "User"))
+    (get-in _test-app-data [:serializers 0 :operations])
+    :delete))
