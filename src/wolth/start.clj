@@ -52,7 +52,7 @@
     (run! (partial apply create-admin-account!) (zipmap app-names applications))
     (reset! wolth-routes generated-routes)
     ;; (reset! wolth-routes r/route-table)
-  ))
+    ))
 
 (def _test-application-path "test/system/person/person.app.edn")
 

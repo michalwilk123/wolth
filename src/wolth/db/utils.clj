@@ -1,6 +1,6 @@
 (ns wolth.db.utils
   (:require [wolth.server.config :refer [cursor-pool]]
-            [next.jdbc :refer [get-datasource execute!]]
+            [next.jdbc :refer [execute!]]
             [wolth.server.exceptions :refer [throw-wolth-exception]]))
 
 (defn get-datasource-from-memory
