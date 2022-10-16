@@ -1,41 +1,12 @@
 (ns wolth.db.uriql
   (:require [clojure.string :as str]
             clojure.walk
+            [wolth.utils.common :refer [get-first-matching-pred]]
             [honey.sql.helpers :as h]))
 
 
 (def open-bracket "(")
 (def close-bracket ")")
-
-(defn create-pairs
-  [coll]
-  (assert (= (mod (count coll) 2) 0) "Number of arguments must be even!")
-  (partition 2 2 coll))
-
-(comment
-  (create-pairs (range 10))
-  (create-pairs (range 11)))
-
-;; TODO: CHANGE THIS!!!
-(defn can-join? [pair] true)
-
-(defn check-if-joining-valid
-  "Check if this collection of objects can be joined together (checking if foreign relationship exists)"
-  [query-pairs]
-  (let [joining-valid (->> query-pairs
-                           (map first)
-                           (partition 2 1)
-                           (every? can-join?))]
-    (if joining-valid
-      query-pairs
-      (throw (AssertionError. (str "Cannot perform join on those objects"
-                                   (map first query-pairs)))))))
-
-(comment
-  (check-if-joining-valid
-    '(("person" "id=1") ("comment" "*") ("movie" "min-age>12"))))
-
-(def objects-url-spec (atom {}))
 
 ; Available operations:
 ; - sort "<<" ">>"
@@ -47,8 +18,6 @@
 (defmacro def-token
   [name & exprs]
   `(def ~name (re-pattern (format "(?<%s>%s)" '~name (str ~@exprs)))))
-
-
 
 (comment
   (clojure.walk/macroexpand-all '(def-token numer #"cxzcxzcxz" "dsads")))
@@ -62,7 +31,7 @@
 (def-token filterDelimiterToken "\\$(and|or)\\$")
 (def-token filterOperatorToken "<|>|(<=)|(>=)|(<>)|(==)")
 (def-token filterExprToken fieldToken filterOperatorToken valueToken)
-(def-token filterTerminalToken #"\(|\)")
+(def-token filterBracketToken #"\(|\)")
 (def-token sortExprToken sortToken "+")
 
 (defn token-found?
@@ -77,32 +46,33 @@
   (token-found? sortToken "<<name>>age" :exact)
   (token-found? sortExprToken "<<name>>age" :exact)
   (token-found? sortExprToken "<<name>>age>" :exact)
-  (str/replace "<<name>>age(dsadsa==1$or$ccc<=21)" sortToken "")
-  ; TODO: TO PONIZEJ NIE DZIAŁA!!!
-)
+  (token-found? filterExprToken "name==1" :exact)
+  (token-found? filterDelimiterToken "$or$" :exact)
+  (token-found? filterOperatorToken "<" :exact)
+  (str/replace "<<name>>age(dsadsa==1$or$ccc<=21)" sortToken ""))
 
 
+#_"THIS TOKEN IS FOR INTERNAL PARSER PURPOSES! DO NOT USE IT!"
 (def filterQueryCandidateRe
   (re-pattern
-    (str/join "|" [filterExprToken filterDelimiterToken filterTerminalToken])))
+    (str/join "|" [filterExprToken filterDelimiterToken filterBracketToken])))
 
 (def-token fullFilterQueryExpr
            open-bracket
-           filterQueryCandidateRe
+           (re-pattern (str/join "|"
+                                 [fieldToken filterOperatorToken valueToken
+                                  filterDelimiterToken filterBracketToken]))
            close-bracket
-           "{2,}")
+           "{3,}")
 
 (comment
   (filterQueryCandidateRe)
   (fullFilterQueryExpr)
   (re-seq filterQueryCandidateRe "dsadsa==1$or$ccc<=21")
-  (token-found? filterQueryCandidateRe "name==john")
-  (token-found? filterQueryCandidateRe "(name==john$and$age>20)" :exact)
-  (token-found? filterQueryCandidateRe
-                "(name<>john$or$(age>=30$and&age<100))"
-                :exact)
   (token-found? fullFilterQueryExpr "name==Adam$and$age>10" :exact)
+  (token-found? fullFilterQueryExpr "name==Adam$and$surname<>kowalski" :exact)
   (token-found? fullFilterQueryExpr "name==Adam" :exact)
+  (token-found? fullFilterQueryExpr "<<name" :exact)
   (str/replace "name==Adam$and$age>10" fullFilterQueryExpr "QQQ")
   (re-matches #"(?<dsads>(<|>|(<=))+)" "<<<="))
 
@@ -347,11 +317,9 @@
                                         table-name
                                         :allow-string-fields
                                         true)]
-                   (cond 
-                     (= ( first current ) :and) (conj current hydrated-query)
-                     (vector? current) (vector :and current hydrated-query)
-                     :else hydrated-query
-                     ))))
+                   (cond (= (first current) :and) (conj current hydrated-query)
+                         (vector? current) (vector :and current hydrated-query)
+                         :else hydrated-query))))
     subquery))
 
 (comment
@@ -363,41 +331,53 @@
                                          [:<> :Person.surname "Kowalski"]]}
                                 "Person"
                                 [:= "owner" "Michał"])
-  (attach-optional-filter-query {}
-                                "Person"
-                                [:= "owner" "Michał"])
-  )
+  (attach-optional-filter-query {} "Person" [:= "owner" "Michał"]))
 
 (defn build-selector-query
-  [table-name selector]
+  [table-name selector &
+   {:keys [sort-clause all-clause filter-clause],
+    :or {all-clause true, filter-clause true, sort-clause true}}]
   (assert (and (string? table-name) (string? selector))
           "Both arguments must be a string!")
-  (cond-> {}
-    ;; (token-found? detailToken selector :exact) (merge (detail-builder table-name
-    ;;                                                                   selector))
-    (token-found? allToken selector :exact) (identity)
-    (token-found? sortExprToken selector :exact) (merge (sort-builder table-name
-                                                                      selector))
-    (token-found? filterQueryCandidateRe selector :exact)
-      (merge (filter-builder table-name selector))
-    (multiple-token-found selector sortToken filterQueryCandidateRe)
-      (merge (sort-builder table-name selector)
-             (filter-builder table-name selector))))
+  (letfn
+    [(all-clause-parser []
+       (and all-clause (token-found? allToken selector :exact) {}))
+     (sort-and-filter-parser []
+       (and sort-clause
+            filter-clause
+            (multiple-token-found selector sortToken filterQueryCandidateRe)
+            (merge (sort-builder table-name selector)
+                   (filter-builder table-name selector))))
+     (sort-parser []
+       (and sort-clause
+            (token-found? sortExprToken selector :exact)
+            (sort-builder table-name selector)))
+     (filter-parser []
+       (and filter-clause
+            (token-found? filterQueryCandidateRe selector :exact)
+            (filter-builder table-name selector)))
+     (syntax-error []
+       (throw (RuntimeException.
+                (format "Uriql syntax error. Unknown syntax: %s" selector))))]
+    (get-first-matching-pred [all-clause-parser sort-and-filter-parser
+                              sort-parser filter-parser syntax-error])))
 
 (comment
   (build-selector-query "Person" "name==michal")
-  (build-selector-query "Person" "(name==michal$and$id<>123)")
-  (token-found? filterQueryCandidateRe "name==michal"))
+  (build-selector-query "Person" "*")
+  (build-selector-query "Person" "<<name(name==michal$and$id<>123)")
+  (build-selector-query "Person" "<<name>>surname")
+  )
 
 (defn build-select
   [table-name selector filter-query & [fields]]
   (-> {:select (or fields :*), :from (keyword table-name)}
-      (merge 
-                        (build-selector-query table-name selector))
+      (merge (build-selector-query table-name selector))
       (attach-optional-filter-query table-name filter-query)))
 
 (comment
   (build-select "Person" "id==111" nil)
+  (build-select "Person" "adsadsa" nil)
   (build-select "Person" "(name<>111)" [:= "hidden" false])
   (build-select "Person" "id==111" [:= "hidden" false])
   (build-select "Person" "<<name>>age" nil)
@@ -410,27 +390,19 @@
 
 (defn build-update
   [table-name selector values filter-query]
-  (let [subquery (merge {:update (keyword table-name), :set values}
-                        (build-selector-query table-name selector))]
-    (if filter-query
-      (update-in subquery
-                 [:where]
-                 (fn [current]
-                   (let [hydrated-query (hydrate-filter-query-w-table-name
-                                          filter-query
-                                          table-name
-                                          :allow-string-fields
-                                          true)]
-                     (if-not current
-                       hydrated-query
-                       (vector :and current hydrated-query)))))
-      subquery)))
+  (-> {:update (keyword table-name), :set values}
+      (merge (build-selector-query table-name selector :sort-clause false))
+      (attach-optional-filter-query table-name filter-query)))
 
 (comment
   (build-update "person"
                 "name==admin"
                 {:name "nowa nazwa", :email "nowy@mail.pl"}
                 nil)
+  (build-update "person"
+                "<<createdAt"
+                {:name "nowa nazwa", :email "nowy@mail.pl"}
+                [:= "id" 112])
   (build-update "person"
                 "*"
                 {:name "nowa nazwa", :email "nowy@mail.pl"}
@@ -440,47 +412,51 @@
 
 
 
-;; (defn build-delete
-;;   [table-name selector]
-;;   (build-subquery {:delete :*, :from (keyword table-name)} table-name
-;;   selector))
+(defn build-delete
+  [table-name selector filter-query]
+  (-> {:delete-from (keyword table-name)}
+      (merge (build-selector-query table-name selector :sort-clause false))
+      (attach-optional-filter-query table-name filter-query)))
+
+(comment
+  (build-delete "person" "name<>michal" nil)
+  (build-delete "person" "*" nil)
+  (build-delete "person" "aaaa" nil)
+  (build-delete "person" "*" [:= "surname" "Kowalski"]))
+
+
+;; (defn build-query-from-url
+;;   [url-string]
+;;   (swap! objects-url-spec assoc :person [[:id] [:name :string] [:age :int]])
+;;   (->> url-string
+;;        (#(str/split % #"/"))
+;;        (remove str/blank?)
+;;        (create-pairs)
+;;        (check-if-joining-valid)
+;;        (map (partial apply build-selector-query))
+;;        ;;  (merge-sql-subqueries)
+;;   ))
+
+
+;; (defn transform-query-into-map
+;;   [query]
+;;   (let [q-splitted (rest (str/split query #"/"))
+;;         view-name (last q-splitted)
+;;         subqueries (partition 2 2 q-splitted)]
+;;     {:view view-name, :subqueries subqueries}))
 
 ;; (comment
-;;   (build-delete "person" "id=111"))
+;;   (transform-query-into-map "/Person/id=1/Post/*/admin"))
 
+;; (def _test-app-data {})
 
-(defn build-query-from-url
-  [url-string]
-  (swap! objects-url-spec assoc :person [[:id] [:name :string] [:age :int]])
-  (->> url-string
-       (#(str/split % #"/"))
-       (remove str/blank?)
-       (create-pairs)
-       (check-if-joining-valid)
-       (map (partial apply build-selector-query))
-       ;;  (merge-sql-subqueries)
-  ))
+;; (defn merge-subqueries
+;;   [app-data s-queries]
+;;   (throw (RuntimeException. "not implemented yet"))
+;;   (map #(apply build-select %) s-queries))
 
-
-(defn transform-query-into-map
-  [query]
-  (let [q-splitted (rest (str/split query #"/"))
-        view-name (last q-splitted)
-        subqueries (partition 2 2 q-splitted)]
-    {:view view-name, :subqueries subqueries}))
-
-(comment
-  (transform-query-into-map "/Person/id=1/Post/*/admin"))
-
-(def _test-app-data {})
-
-(defn merge-subqueries
-  [app-data s-queries]
-  (throw (RuntimeException. "not implemented yet"))
-  (map #(apply build-select %) s-queries))
-
-(comment
-  (merge-subqueries {}
-                    ((transform-query-into-map "/Person/id=1/Post/*/admin")
-                      :subqueries)))
+;; (comment
+;;   (merge-subqueries {}
+;;                     ((transform-query-into-map "/Person/id=1/Post/*/admin")
+;;                       :subqueries)))
 
