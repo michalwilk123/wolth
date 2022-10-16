@@ -30,20 +30,13 @@
   {:name ::DSAKDNS,
    :enter (fn [x]
             (assoc x
-              :response
-                {:status 201,
-                 :body (str "TESTING MESSAGE  "
-                            (select-keys x [:exception-occured :response]))}))})
+              :response {:status 201,
+                         :body (str "TESTING MESSAGEE  "
+                                    (select-keys x
+                                                 [:exception-occured :response
+                                                  :request]))}))})
 
 (defn test-resp [ctx] {:status 200, :body "OK"})
-
-;; (def route-table
-;;   (route/expand-routes #{["/app/User/id/user-admin" :get
-;;                           'test-resp
-;;                           :route-name :czytanie-zwyklego-usera]
-;;                          ["/app/User/user-regular" :post
-;;                           'test-resp
-;;                           :route-name :tworzenie-zwyklego-usera]}))
 
 
 (def route-table
@@ -69,8 +62,8 @@
       ["/person/User/user-regular" :post
        [(body-params/body-params) http/json-body utility-interceptor
         auth/authenticator-interceptor auth/model-authorizer-interceptor
-        serializers/model-serializer-interceptor ii] :route-name
-       :tworzenie-zwyklego-usera]
+        ; serializers/model-serializer-interceptor
+        ii] :route-name :tworzenie-zwyklego-usera]
       ["/app2/Person" :post
        [(body-params/body-params) 'http/json-body
         'serializers/model-serializer-interceptor
@@ -83,6 +76,7 @@
   (first (clojure.pprint/pprint route-table))
   (url-for :czytanie-zwyklego-usera {:hehe 2222})
   (url-for :tworzenie-zwyklego-usera))
+
 
 (def ^:private _test-app-data
   {:functions [{:funcName "timeSince",
@@ -103,11 +97,12 @@
                                        :fields ["name" "note" "id"]},
                                 :update {:fields ["name"]}}]}]})
 
+
 (defn generate-routes-for-serializer-operation
   [app-name serializer-name serializer-operation & [related-models]]
   (let [model-name (get serializer-operation :model)
         base-uri (format "/%s/%s" app-name model-name)
-        detail-uri (str base-uri "/:id/" serializer-name)
+        ;; detail-uri (str base-uri "/:id/" serializer-name)
         selector-param (format ":%s-query" model-name)
         select-uri (str base-uri (str "/" selector-param "/") serializer-name)
         create-uri (str base-uri "/" serializer-name)
@@ -125,10 +120,10 @@
         (conj [create-uri :post interceptors :route-name
                (keyword (str route-name "-post"))])
       (get serializer-operation :update)
-        (conj [detail-uri :patch interceptors :route-name
+        (conj [select-uri :patch interceptors :route-name
                (keyword (str route-name "-patch"))])
       (get serializer-operation :delete)
-        (conj [detail-uri :delete interceptors :route-name
+        (conj [select-uri :delete interceptors :route-name
                (keyword (str route-name "-delete"))]))))
 
 (comment
@@ -169,21 +164,39 @@
   (generate-routes-for-serializer "person"
                                   (get-in _test-app-data [:serializers 0])))
 
+#_"
+   1. Sprawdzam gdzie jest funkcja w konfiguracji
+   2. Ładuje funkcje w namespace-ie pod odpowiednim miejsce
+   "
 (defn generate-routes-for-functions [app-name functions] (list))
 
 (defn generate-routes-for-app
   [app-name app-data]
-  (let [auth-uri (format "/%s/auth" app-name)]
-    (concat (apply concat
+  (let [auth-uri (format "/%s/auth" app-name)
+        logout-uri (format "/%s/logout" app-name)
+        routes
+          (concat
+            (apply concat
               (map (partial generate-routes-for-serializer app-name)
                 (get app-data :serializers)))
             (list [auth-uri :post
                    [(body-params/body-params) http/json-body utility-interceptor
                     auth/token-auth-login-interceptor] :route-name
                    (keyword (str app-name "-token-auth-request"))])
+            (list [logout-uri :post
+                   [(body-params/body-params) http/json-body utility-interceptor
+                    auth/token-auth-login-interceptor] :route-name
+                   (keyword (str app-name "-token-logout-request"))])
             (apply concat
               (map (partial generate-routes-for-functions app-name)
-                (get app-data :functions))))))
+                (get app-data :functions))))]
+    (run!
+      (fn [rt]
+        (let [f-string (format "Method: %s, URL: %s;" (second rt) (first rt))]
+          (log/info ::generate-routes-for-app f-string)
+          (println f-string)))
+      routes)
+    routes))
 
 (comment
   (generate-routes-for-app "test-app" _test-app-data))
