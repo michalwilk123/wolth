@@ -2,9 +2,14 @@
   (:require [wolth.db.models :as models]
             [wolth.db.utils :refer [execute-sql-expr!]]
             [io.pedestal.log :as log]
+            [next.jdbc :as jdbc]
+            [wolth.server.config :refer [def-context cursor-pool]]
             [wolth.utils.common :refer [sql-map->map]]
             [honey.sql :as sql]))
 
+(def-context _test-context
+             {cursor-pool {"person" (jdbc/get-datasource
+                                      {:dbtype "h2", :dbname "mydatabase"})}})
 
 (def user-table
   {:name "User",
@@ -61,12 +66,8 @@
     (if-not (empty? fetched) fetched nil)))
 
 (comment
-  (fetch-user-data "myAdmin" "person")
-  (fetch-user-data "myAdmina" "person"))
-
-
-(comment
-  (models/generate-create-table-sql [token-table user-table]))
+  (_test-context '(fetch-user-data "myAdmin" "person"))
+  (_test-context '(fetch-user-data "myAdmina" "person")))
 
 (defn save-auth-token
   [user-id token app-name]
@@ -77,6 +78,33 @@
        (execute-sql-expr! app-name)))
 
 (comment
-  (save-auth-token "90692522-3c84-4fe4-9fcd-25b7ebaf828d" "TOKEN" "person")
+  (_test-context
+    '(save-auth-token "90692522-3c84-4fe4-9fcd-25b7ebaf828d" "token" "person"))
   (execute-sql-expr! "person" ["DELETE FROM Token;"])
   (execute-sql-expr! "person" ["SELECT * FROM User;"]))
+
+(defn remove-user-tokens
+  [user-id app-name]
+  (log/info ::remove-user-tokens
+            (str "Removing token for user with ID: " user-id))
+  (->> {:delete-from :Token, :where [:= :User.userId user-id]}
+       (sql/format)
+       (execute-sql-expr! app-name)))
+
+(comment
+  (_test-context
+    '(save-auth-token "90692522-3c84-4fe4-9fcd-25b7ebaf828d" "TOKEN" "person"))
+  (remove-user-tokens "90692522-3c84-4fe4-9fcd-25b7ebaf828d" "person"))
+
+(defn user-token-exists?
+  [token-string app-name]
+  (assert (string? token-string))
+  (->> {:select :*, :from [:Token], :where [:= :Token.signature token-string]}
+       (sql/format)
+       (execute-sql-expr! app-name)
+       (seq)
+       (some?)))
+
+(comment
+  (_test-context '(user-token-exists? "token" "person"))
+  (_test-context '(user-token-exists? "nie istnieje" "person")))

@@ -1,6 +1,6 @@
 (ns wolth.utils.auth
   (:require
-    [wolth.db.user :refer [fetch-user-data save-auth-token]]
+    [wolth.db.user :refer [fetch-user-data save-auth-token remove-user-tokens]]
     [io.pedestal.log :as log]
     [wolth.utils.crypto :as crypto]
     [wolth.server.utils :as server-utils]
@@ -21,8 +21,6 @@
 (defonce JWT-HEADER "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")
 
 
-(def operations-lut
-  {:post :create, :delete :delete, :get :read, :patch :udpate})
 
 (def _test-jwt-token
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkYW0iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY0MTQ3NzI5LCJ0dGwiOjYwNDgwMH0.kv47aXxC7EbyuR_yg8EpoeRXiHfKon7MJP5LSFcyE0Y")
@@ -89,8 +87,8 @@
                       :delete true}]}]})
 
 (def-context _test-context
-             {cursor-pool {"test-app" (jdbc/get-datasource {:dbtype "h2",
-                                                            :dbname "app"})},
+             {cursor-pool {"test-app" (jdbc/get-datasource
+                                        {:dbtype "h2", :dbname "mydatabase"})},
               app-data-container {"person" _test-app-data}})
 
 (defn get-current-epoch
@@ -102,6 +100,7 @@
 
 (comment
   (get-current-epoch))
+
 
 
 (defn parse-jwt-safely
@@ -149,7 +148,6 @@
 (defn fetch-and-validate-jwt-token
   [jwt-string app-name]
   (let [[header payload signature] (parse-jwt-safely jwt-string)]
-    (println header payload signature)
     (if (not= header JWT-HEADER)
       (throw-wolth-exception :400 "Unknown wolth exception")
       nil)
@@ -157,8 +155,7 @@
       (if (empty? user-data)
         (throw-wolth-exception :404
                                (str "Cannot find user: " (payload :username)))
-        (let [oo (println user-data)
-              calculated-jwt-string (create-jwt-string payload
+        (let [calculated-jwt-string (create-jwt-string payload
                                                        (user-data :password))
               generated-sig (last (str/split calculated-jwt-string #"\."))]
           (if (crypto/compare-digest generated-sig signature)
@@ -200,9 +197,7 @@
     (assert (= 2 (count body-params)))
     (log/info ::token-request (str "PROVIDED DATA: " body-params))
     (if-let [user-data (fetch-user-data (body-params :username) app-name)]
-      (if (or (println (body-params :password) (user-data :password))
-              (crypto/verify-password (body-params :password)
-                                      (user-data :password)))
+      (if (crypto/verify-password (body-params :password) (user-data :password))
         (let [token-parts (vals (select-keys user-data
                                              [:id :username :role :password]))
               jwt-token (apply build-and-save-jwt-token
@@ -216,11 +211,6 @@
 
 (def token-auth-login-interceptor
   {:name ::TOKEN-LOGIN-WOLTH-INTERCEPTOR, :enter token-login-request})
-
-(def-interceptor-fn token-logout-request [ctx] ctx)
-
-(def token-auth-login-interceptor
-  {:name ::TOKEN-LOGOUT-WOLTH-INTERCEPTOR, :enter token-logout-request})
 
 #_"
   If user has invalid header, bad password, bad username then
@@ -247,6 +237,26 @@
 (def authenticator-interceptor
   {:name ::AUTHENTICATOR-INTERCEPTOR, :enter authenticate-user})
 
+; TODO: TO DZISIAJ ROBIMY
+;; (def-interceptor-fn token-logout-request [ctx] (assert false))
+#_"We expect that user is logged in and authenticated. After that we do actual
+   logging out"
+(defn token-logout-request
+  [ctx]
+  (if-let [user-data (ctx :logged-user)]
+    (do (log/info ::token-logout-request
+                  (format "User: %s is loging out" (ctx :logged-user)))
+        (remove-user-tokens (user-data :username) (ctx :app-name)))
+    (throw-wolth-exception :403 "Cannot log out not logged in user!")))
+(comment
+  (token-logout-request _test-request-map)
+  (token-logout-request (assoc _test-request-map
+                          :logged-user {:username "michal", :id "dasdsadsa"})))
+
+(def token-auth-logout-interceptor
+  {:name ::TOKEN-LOGOUT-WOLTH-INTERCEPTOR, :enter token-logout-request})
+
+
 (defn authorize-by-user-role
   [allowed-roles user-role]
   (cond (true? allowed-roles) nil
@@ -265,7 +275,7 @@
 
 (defn authorize-by-user-operation
   [serializer accessed-tables method]
-  (let [translated-method (operations-lut method)
+  (let [translated-method (server-utils/operations-lut method)
         serializer-objects (serializer :operations)]
     (letfn
       [(find-related-object [table-name]
@@ -299,10 +309,6 @@
     ["User"]
     :post))
 
-; TODO: TO DZISIAJ MASZ DO ROBOTY!!
-#_"sprawdzamy czy istnieje mapa z danymi, jezeli nie to ustawiamy role jako publiczna
-   Potem sprawdzamy czy serializer zgadza sie z rola uzytkownika. Jezeli
-   nie to rzucamy wyjatek 403"
 (def-interceptor-fn
   authorize-user
   [ctx]
@@ -327,5 +333,7 @@
 (def model-authorizer-interceptor
   {:name ::AUTHORIZER-INTERCEPTOR, :enter authorize-user})
 
+(def-interceptor-fn function-authorize-user [ctx])
+
 (def function-authorizer-interceptor
-  {:name ::AUTHORIZER-INTERCEPTOR, :enter authorize-user})
+  {:name ::AUTHORIZER-INTERCEPTOR, :enter function-authorize-user})
