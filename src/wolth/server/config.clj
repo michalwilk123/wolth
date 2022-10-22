@@ -1,5 +1,4 @@
-(ns wolth.server.config
-  (:require [next.jdbc :as jdbc]))
+(ns wolth.server.config)
 
 (defonce cursor-pool (atom nil))
 
@@ -7,12 +6,13 @@
 
 (def wolth-routes (atom nil))
 
-(defonce _test_atom_1 (atom 1))
-(defonce _test_atom_2 (atom 2))
+(def bank-namespaces (atom {}))
 
 (defn set-atom-state! [dict] (run! (fn [[key value]] (reset! key value)) dict))
 
 (comment
+  (defonce _test_atom_1 (atom 1))
+  (defonce _test_atom_2 (atom 2))
   (set-atom-state! {_test_atom_1 121, _test_atom_2 333}))
 
 #_"This macro mocks the environment atoms. Very useful for testing
