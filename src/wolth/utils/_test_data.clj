@@ -12,6 +12,11 @@
                 :path "functions/clojureFunction.clj",
                 :type :clojure}
                {:allowed-roles ["admin"],
+                :function-name "dateFunc",
+                :name "getDate",
+                :path "functions/datesCode.clj",
+                :args [["num" :int]]}
+               {:allowed-roles ["admin"],
                 :args [["str" :int]],
                 :function-name "isPrime?",
                 :name "check-if-prime",
