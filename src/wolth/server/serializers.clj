@@ -1,107 +1,26 @@
 (ns wolth.server.serializers
-  (:require [wolth.utils.common :as utils]
-            [wolth.server.exceptions :refer
-             [throw-wolth-exception def-interceptor-fn]]
-            [honey.sql :as sql]
-            [ring.util.codec :refer [url-decode]]
-            [io.pedestal.log :as log]
-            [wolth.server.utils :as server-utils]
-            [wolth.server.bank :as bank-utils]
-            [wolth.db.uriql :refer
-             [build-select merge-select-hsql merge-update-hsql build-update
-              build-delete]]
-            [wolth.server.config :refer [def-context app-data-container]]
-            [wolth.db.fields :as fields]
-            [io.pedestal.http.body-params :as body-params]
-            [wolth.utils.common :as common]))
+  (:require
+    [wolth.utils.common :as utils]
+    [wolth.server.exceptions :refer [throw-wolth-exception def-interceptor-fn]]
+    [honey.sql :as sql]
+    [ring.util.codec :refer [url-decode]]
+    [io.pedestal.log :as log]
+    [wolth.server.utils :as server-utils]
+    [wolth.server.-test-data :refer
+     [_test-get-request-map _test-delete-request-map _test-patch-request-map
+      _test-post-request-map _serializers_test_app_data _test-object-spec
+      _test-normalized-fields _test-json-body]]
+    [wolth.server.bank :as bank-utils]
+    [wolth.db.uriql :refer
+     [build-select merge-select-hsql merge-update-hsql build-update
+      build-delete]]
+    [wolth.server.config :refer [def-context app-data-container]]
+    [wolth.db.fields :as fields]
+    [io.pedestal.http.body-params :as body-params]
+   ))
 
-(def ^:private _test-serializer-spec
-  {:name "public",
-   :allowed-roles true,
-   :operations [{:model "User",
-                 :read {:fields ["email" "username" "id"], :attached []},
-                 :update {:fields ["username" "email"]},
-                 :create {:fields ["username" "email" "password"],
-                          :attached [["role" "regular"]]},
-                 :delete true}]})
-
-(def ^:private _test-object-spec
-  '({:name "User",
-     :fields
-       [{:constraints [:not-null :unique], :name "username", :type :str128}
-        {:constraints [:not-null], :name "password", :type :password}
-        {:constraints [:not-null], :name "role", :type :str128}
-        {:constraints [:unique], :name "email", :type :str128}],
-     :options [:uuid-identifier]}))
-
-(def ^:private _test-normalized-fields
-  {:id "65ebc5a7-348c-4bb7-a58b-54d96a1b41bf",
-   :username "Mariusz",
-   :password
-     "100$12$argon2id$v13$qen5BpBkZOs7qT9abjb9iA$eq9Fr5Im3Nqx35GHDIMg7ADbyq09zvuoV+sbvNlYYWI$$$",
-   :email "mariusz@gmail.com",
-   :role "regular"})
-
-(def _test-json-body
-  {:username "Mariusz", :password "haslo", :email "mariusz@gmail.com"})
-
-(def ^:private _test-post-request-map
-  {:request {:json-params _test-json-body,
-             :remote-addr "127.0.0.1",
-             :uri "/test-app/User/public",
-             :path-params {},
-             :request-method :post}})
-
-(def ^:private _test-get-request-map
-  {:logged-user {:username "Przemek", :id 22222},
-   :request {:json-params {},
-             :uri "/test-app/User/*/public",
-             :path-params {:User_query "*"},
-             :request-method :get}})
-
-(def ^:private _test-patch-request-map
-  {:logged-user {:username "Przemek", :id 22222},
-   :request {:json-params {:username "Marek"},
-             :uri "/test-app/User/username==Przemek/public",
-             :path-params {:User_query "username==Przemek"},
-             :request-method :patch}})
-
-(def ^:private _test-delete-request-map
-  {:logged-user {:username "Przemek", :id 22222},
-   :request {:json-params {},
-             :uri "/test-app/User/*/public",
-             :path-params {:User_query "username==Przemek"},
-             :request-method :delete}})
-
-(def ^:private _test-bank-request-map
-  {:logged-user {:username "Przemek", :id 22222},
-   :request {:json-params {},
-             :uri "/test-app/User/*/public",
-             :query-params {:num 50},
-             :request-method :delete}})
-
-(def ^:private _test-app-data
-  {:objects
-     [{:name "User",
-       :fields
-         [{:constraints [:not-null :unique], :name "username", :type :str128}
-          {:constraints [:not-null], :name "password", :type :password}
-          {:constraints [:not-null], :name "role", :type :str128}
-          {:constraints [:unique], :name "email", :type :str128}],
-       :options [:uuid-identifier]}],
-   :functions [{:name "getDate"}],
-   :serializers [{:name "public",
-                  :allowed-roles ["admin"],
-                  :operations [{:model "User",
-                                :read {:fields ["username" "email"],
-                                       :filter [:= "author" :user-id]},
-                                :update {:fields ["username" "email"]},
-                                :create {:fields ["username" "email"
-                                                  "password"],
-                                         :attached [["role" "regular"]]},
-                                :delete true}]}]})
-
-(def-context _test-context {app-data-container {"test-app" _test-app-data}})
+(def-context _test-context
+             {app-data-container {"test-app" _serializers_test_app_data}})
 
 (defn- normalize-field
   [verbose-field]
@@ -122,7 +41,7 @@
   [object-data field]
   (let [object-fields (object-data :fields)
         [key value] field
-        related-table (common/find-first #(= (% :name) (name key))
+        related-table (utils/find-first #(= (% :name) (name key))
                                          object-fields)]
     (if (nil? related-table) nil (assoc related-table :data value))))
 
@@ -301,7 +220,7 @@
         app-data (server-utils/get-associated-app-data! app-name)
         objects-data (server-utils/get-associated-objects (app-data :objects)
                                                           tables)
-        _raw-serializer-data (common/find-first #(= serializer-name (% :name))
+        _raw-serializer-data (utils/find-first #(= serializer-name (% :name))
                                                 (get app-data :serializers))
         _related-serializer-spec (server-utils/get-related-serializer-spec
                                    objects-data
@@ -360,20 +279,3 @@
 
 (def bank-serializer-interceptor
   {:name ::BANK-SERIALIZER-INTERCEPTOR, :enter 'serialize-into-bank})
-
-;; (defn fields->update-sql
-;;   [table fields id-field]
-;;   (sql/format
-;;     {:update [(keyword table)], :set fields, :where [:= :id id-field]}))
-
-;; (comment
-;;   (fields->update-sql "User"
-;;                       (select-keys _test-normalized-fields [:email])
-;;                       "35fcfd5c-674e-4d56-9483-a026d50ac658"))
-
-;; [path-params -object-spec]
-;; (assert (seq? -object-spec))
-;; (let [object-spec (first -object-spec)
-;;       table-name (:name object-spec)
-;;       object-identifier (first (vals path-params))]
-;;   (fields->delete-sql table-name object-identifier)))
