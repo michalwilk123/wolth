@@ -8,13 +8,14 @@
             [wolth.db.models :refer [generate-create-table-sql]]
             [wolth.utils.crypto :refer [create-password-hash]]
             [wolth.db.fields :refer [create-uuid]]
+            [wolth.utils.common :refer [create-random-string]]
             [wolth.utils.-test-data :refer
              [_test_application_path _loader_test_app_data]]
             [wolth.server.config :refer
              [cursor-pool app-data-container bank-namespaces]]
             [io.pedestal.log :as log]))
 
-(def WOLTH-GENERATED-NS-PREFIX "--funcs")
+(defonce WOLTH-GENERATED-NS-PREFIX (str (create-random-string 8) "--funcs"))
 
 (defn throw-loader-exception
   [reason]

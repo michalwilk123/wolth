@@ -125,3 +125,16 @@
 (comment
   (get-first-matching-pred [(partial identity false) (partial identity 10)
                             (partial even? 122)]))
+
+(defn- char-range [lo hi] (range (int lo) (inc (int hi))))
+
+(def ^:private alpha-numeric
+  (map char (concat (char-range \a \z) (char-range \A \Z) (char-range \0 \9))))
+
+(defn create-random-string
+  [n]
+  (apply str (take n (repeatedly #(rand-nth alpha-numeric)))))
+
+
+(comment
+  (create-random-string 10))
