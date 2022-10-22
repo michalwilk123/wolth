@@ -1,37 +1,13 @@
 (ns wolth.server.utils
   (:require [clojure.string :as str]
             [wolth.server.config :refer [app-data-container]]
+            [wolth.server.-test-data :refer [_server_test_app_data]]
             [wolth.server.exceptions :refer
              [def-interceptor-fn throw-wolth-exception]]
             [wolth.utils.common :as common]))
 
 (def operations-lut
   {:post :create, :delete :delete, :get :read, :patch :update})
-
-(def _test-app-data
-  {:objects
-     [{:fields [{:constraints [:not-null], :name "name", :type :str32}
-                {:name "note", :type :text}],
-       :name "Person",
-       :options [:uuid-identifier]}
-      {:name "User",
-       :fields
-         [{:constraints [:not-null :unique], :name "username", :type :str128}
-          {:constraints [:not-null], :name "password", :type :password}
-          {:constraints [:not-null], :name "role", :type :str128}
-          {:constraints [:unique], :name "email", :type :str128}],
-       :options [:uuid-identifier]}],
-   :functions [{:name "getDate"}],
-   :serializers [{:name "public",
-                  :allowed-roles ["admin"],
-                  :operations
-                    [{:model "User",
-                      :read {:fields ["author" "content" "id"], :attached []},
-                      :update {:fields ["username" "email"]},
-                      :create {:fields ["username" "email" "password"],
-                               :attached [["role" "regular"]]},
-                      :delete true}
-                     {:model "Person", :create {:fields ["note" "name"]}}]}]})
 
 (defn get-associated-app-data!
   [app-name]
@@ -50,8 +26,8 @@
     table-names))
 
 (comment
-  (get-associated-objects (_test-app-data :objects) (list "User" "Person"))
-  (get-associated-objects (_test-app-data :objects) (list "Person" "User")))
+  (get-associated-objects (_server_test_app_data :objects) (list "User" "Person"))
+  (get-associated-objects (_server_test_app_data :objects) (list "Person" "User")))
 
 
 (defn uri->parsed-info
@@ -116,10 +92,10 @@
 
 (comment
   (get-related-serializer-spec
-    (get-associated-objects (_test-app-data :objects) (list "User" "Person"))
-    (get-in _test-app-data [:serializers 0 :operations])
+    (get-associated-objects (_server_test_app_data :objects) (list "User" "Person"))
+    (get-in _server_test_app_data [:serializers 0 :operations])
     :post)
   (get-related-serializer-spec
-    (get-associated-objects (_test-app-data :objects) (list "User"))
-    (get-in _test-app-data [:serializers 0 :operations])
+    (get-associated-objects (_server_test_app_data :objects) (list "User"))
+    (get-in _server_test_app_data [:serializers 0 :operations])
     :delete))
