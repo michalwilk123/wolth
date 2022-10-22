@@ -26,8 +26,10 @@
     table-names))
 
 (comment
-  (get-associated-objects (_server_test_app_data :objects) (list "User" "Person"))
-  (get-associated-objects (_server_test_app_data :objects) (list "Person" "User")))
+  (get-associated-objects (_server_test_app_data :objects)
+                          (list "User" "Person"))
+  (get-associated-objects (_server_test_app_data :objects)
+                          (list "Person" "User")))
 
 
 (defn uri->parsed-info
@@ -58,8 +60,6 @@
   (uri->app-name "/app/Person/public")
   (uri->app-name "/app/Person"))
 
-;; (def-interceptor-fn utility-interceptor-fn [ctx] (assoc ctx :appname
-;; (uri->app-name (ctx :uri))))
 (def-interceptor-fn utility-interceptor-fn
                     [ctx]
                     (assoc ctx
@@ -92,7 +92,8 @@
 
 (comment
   (get-related-serializer-spec
-    (get-associated-objects (_server_test_app_data :objects) (list "User" "Person"))
+    (get-associated-objects (_server_test_app_data :objects)
+                            (list "User" "Person"))
     (get-in _server_test_app_data [:serializers 0 :operations])
     :post)
   (get-related-serializer-spec
