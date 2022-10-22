@@ -1,9 +1,8 @@
 {:functions [{:allowed-roles ["admin"],
               :args [["num" :int]],
               :function-name "nPrimes2",
-              :name "primes",
-              :path "clojureFunction.clj",
-              :type :clojure}],
+              :name "getPrimes",
+              :path "functions/clojureFunction.clj"}],
  :meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
  :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
                      {:name "note", :type :text}],
