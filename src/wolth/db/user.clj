@@ -28,6 +28,11 @@
             {:constraints [:not-null], :name "userId", :type :uuid}],
    :options [:use-h2]})
 
+#_"Default policy:
+   - Admin can create any account, update (fe: change password) of any account
+   - Admin can read all fields of users excluding their password hash
+   - Admin can update any user
+   - Admin can delete every account, not including his own :)"
 (def user-admin-view
   {:allowed-roles ["admin"],
    :name "user-admin",
@@ -35,16 +40,17 @@
                  :update {:fields ["username" "password" "role" "email"]},
                  :read {:fields ["id" "username" "role" "email"]},
                  :model "User",
-                 :delete true}]})
+                 :delete {:filter [:<> "id" :user-id]}}]})
 
 (def user-regular-view
   {:allowed-roles true,
    :name "user-regular",
    :operations [{:create {:fields ["username" "password" "email"],
                           :attached [["role" "regular"]]},
-                 :update {:fields ["username" "email"]},
+                 :update {:fields ["username" "email" "password"],
+                          :filter [:= "id" :user-id]},
                  :model "User",
-                 :delete true}]})
+                 :delete {:filter [:= "id" :user-id]}}]})
 
 (defn format-sql-response [sql-resp])
 
@@ -87,14 +93,14 @@
   [user-id app-name]
   (log/info ::remove-user-tokens
             (str "Removing token for user with ID: " user-id))
-  (->> {:delete-from :Token, :where [:= :User.userId user-id]}
+  (->> {:delete-from :Token, :where [:= :Token.userId user-id]}
        (sql/format)
        (execute-sql-expr! app-name)))
 
 (comment
   (_test-context
     '(save-auth-token "90692522-3c84-4fe4-9fcd-25b7ebaf828d" "TOKEN" "person"))
-  (remove-user-tokens "90692522-3c84-4fe4-9fcd-25b7ebaf828d" "person"))
+  (remove-user-tokens "3c2602ea-8771-46cb-bd20-31eb5a8b47e3" "person"))
 
 (defn user-token-exists?
   [token-string app-name]
