@@ -8,36 +8,13 @@
             [wolth.db.models :refer [generate-create-table-sql]]
             [wolth.utils.crypto :refer [create-password-hash]]
             [wolth.db.fields :refer [create-uuid]]
-            [wolth.server.config :refer [cursor-pool app-data-container]]
-            [io.pedestal.log :as log]
-            [next.jdbc :as jdbc]))
+            [wolth.utils.-test-data :refer
+             [_test_application_path _loader_test_app_data]]
+            [wolth.server.config :refer
+             [cursor-pool app-data-container bank-namespaces]]
+            [io.pedestal.log :as log]))
 
-(def _test-application-path "test/system/person/person.app.edn")
-
-(def _test-app-data
-  {:meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
-   :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
-                       {:name "note", :type :text}],
-              :name "Person",
-              :options [:uuid-identifier]}
-             {:fields [{:name "content", :type :text}],
-              :name "Post",
-              :options [:uuid-identifier],
-              :relations [{:name "author",
-                           :ref-type :o2m,
-                           :references "Person",
-                           :related-name "posts"}]}],
-   :persistent-db {:dbname "mydatabase", :dbtype "h2"},
-   :serializers [{:allowed-roles ["public"],
-                  :name "public",
-                  :operations [{:create {:attached [["note" "Testowa notatka"]],
-                                         :fields ["name"]},
-                                :delete true,
-                                :model "Person",
-                                :read {:attached [],
-                                       :fields ["name" "note" "id"]},
-                                :update {:fields ["name"]}}]}]})
-
+(def WOLTH-GENERATED-NS-PREFIX "--funcs")
 
 (defn throw-loader-exception
   [reason]
@@ -51,7 +28,7 @@
       (read-string)))
 
 (comment
-  (load-application! _test-application-path))
+  (load-application! _test_application_path))
 
 ; tutaj odpalam spec
 (defn test-application-file!
@@ -70,7 +47,7 @@
             (format "File %s loaded without errors" app-path)))
 
 (comment
-  (test-application-file! _test-application-path)
+  (test-application-file! _test_application_path)
   (test-application-file! "dasdnsjadkjsan")
   (test-application-file! "logs/tfile.txt"))
 
@@ -82,7 +59,7 @@
                  #(conj % user/user-admin-view user/user-regular-view))))
 
 (comment
-  (clojure.pprint/pprint (load-user-functionalities _test-app-data)))
+  (clojure.pprint/pprint (load-user-functionalities _loader_test_app_data)))
 
 (defn store-applications!
   [app-names app-datas]
@@ -93,7 +70,7 @@
                       (str/join ", " app-names)))))
 
 (comment
-  (store-applications! '("test-app") (list _test-app-data))
+  (store-applications! '("test-app") (list _loader_test_app_data))
   (deref app-data-container))
 
 
@@ -108,11 +85,9 @@
                       (str/join ", " app-names)))))
 
 (comment
-  (store-db-connections! '("test-app1") (list _test-app-data))
+  (store-db-connections! '("test-app1") (list _loader_test_app_data))
   (deref cursor-pool))
 
-
-(defn store-routes! [routes])
 
 (defn create-sql-tables!
   [app-names applications]
@@ -123,7 +98,7 @@
           (zipmap app-names table-sql))))
 
 (comment
-  (create-sql-tables! '("test-app1") (list _test-app-data)))
+  (create-sql-tables! '("test-app1") (list _loader_test_app_data)))
 
 (defn admin-account-exists?
   [app-name admin-name]
@@ -163,6 +138,81 @@
             app-name))))))
 
 (comment
-  (create-admin-account! "person" _test-app-data)
+  (create-admin-account! "person" _loader_test_app_data)
   (execute-sql-expr! "person"
                      ["DELETE FROM User WHERE USERNAME = ?" "myAdmin"]))
+
+(defn- create-namespaces!
+  [app-names]
+  (reset! bank-namespaces {})
+  (run!
+    (fn [single-app-name]
+      (let [str-namespace (str WOLTH-GENERATED-NS-PREFIX "-" single-app-name)
+            sym-namespace (symbol str-namespace)]
+        (swap! bank-namespaces assoc
+          single-app-name
+          (create-ns sym-namespace))))
+    app-names))
+
+(comment
+  (create-namespaces! (list "application1" "app2"))
+  @bank-namespaces
+  (reset! bank-namespaces {}))
+
+(defn- load-under-ns!
+  [app-namespace symbols-to-load result-names filename]
+  (assert (= (count symbols-to-load) (count result-names)))
+  (letfn [(load-function-under-ns [sym-to-load name-to-load]
+            (intern app-namespace
+                    (symbol name-to-load)
+                    (eval (symbol sym-to-load))))]
+    (load-file filename) (run! (partial apply load-function-under-ns)
+                               (zipmap symbols-to-load result-names))))
+
+(comment
+  (load-under-ns! (create-ns 'abc)
+                  (list "nPrimes2")
+                  (list "primes")
+                  "functions/clojureFunction.clj"))
+
+(defn- fetch-function-data
+  [func-data]
+  (vals (select-keys func-data [:path :function-name :name])))
+
+(comment
+  (fetch-function-data (first (_loader_test_app_data :functions))))
+
+(defn- load-app-functions!
+  [func-ns functions]
+  (log/info ::load-app-functions!
+            (str "Loading functions under namespace: " (ns-name func-ns)))
+  (let [-func-map
+          (reduce (fn [accum el]
+                    (let [[path sym name] (fetch-function-data el)
+                          vec-to-insert (vector sym name)]
+                      (update-in accum [path] (partial cons vec-to-insert))))
+            {}
+            functions)
+        func-map (reduce-kv (fn [acc k val]
+                              (assoc acc
+                                k {:sym-names (map first val),
+                                   :f-names (map second val)}))
+                            {}
+                            -func-map)]
+    (run! (fn [[fpath val]]
+            (load-under-ns! func-ns (val :sym-names) (val :f-names) fpath))
+          func-map)))
+
+(comment
+  (load-app-functions! (create-ns 'aaa) (_loader_test_app_data :functions)))
+
+(defn load-bank-functions!
+  [app-names app-datas]
+  (create-namespaces! app-names)
+  (let [app-functions (map :functions app-datas)
+        app-namespaces (map @bank-namespaces app-names)]
+    (run! (partial apply load-app-functions!)
+          (zipmap app-namespaces app-functions))))
+
+(comment
+  (load-bank-functions! (list "test-app1") (list _loader_test_app_data)))
