@@ -126,15 +126,25 @@
   (get-first-matching-pred [(partial identity false) (partial identity 10)
                             (partial even? 122)]))
 
+
+; source:
+; https://michaelwhatcott.com/generating-random-alphanumeric-codes-in-clojure/
 (defn- char-range [lo hi] (range (int lo) (inc (int hi))))
 
 (def ^:private alpha-numeric
   (map char (concat (char-range \a \z) (char-range \A \Z) (char-range \0 \9))))
 
-(defn create-random-string
+(defn rand-string
   [n]
   (apply str (take n (repeatedly #(rand-nth alpha-numeric)))))
 
+(comment
+  (rand-string 10))
+
+
+(defn multiple-get [in-map keys] ((apply juxt keys) in-map))
 
 (comment
-  (create-random-string 10))
+  (multiple-get {:aaa 123, :bbb 999, :ccc 1000, :ddd 1001}
+                [:bbb :ccc :aaa :ddd])
+  (multiple-get {:aaa 123, :bbb 999, :ccc 1000, :ddd 1001} [:ddd :bbb]))

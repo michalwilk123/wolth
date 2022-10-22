@@ -8,14 +8,14 @@
             [wolth.db.models :refer [generate-create-table-sql]]
             [wolth.utils.crypto :refer [create-password-hash]]
             [wolth.db.fields :refer [create-uuid]]
-            [wolth.utils.common :refer [create-random-string]]
+            [wolth.utils.common :refer [rand-string multiple-get]]
             [wolth.utils.-test-data :refer
              [_test_application_path _loader_test_app_data]]
             [wolth.server.config :refer
              [cursor-pool app-data-container bank-namespaces]]
             [io.pedestal.log :as log]))
 
-(defonce WOLTH-GENERATED-NS-PREFIX (str (create-random-string 8) "--funcs"))
+(defonce WOLTH-GENERATED-NS-PREFIX (str (rand-string 8) "--funcs"))
 
 (defn throw-loader-exception
   [reason]
@@ -143,6 +143,15 @@
   (execute-sql-expr! "person"
                      ["DELETE FROM User WHERE USERNAME = ?" "myAdmin"]))
 
+(defn create-namespace-name
+  [app-name]
+  (->> app-name
+       (str WOLTH-GENERATED-NS-PREFIX "-")
+       (symbol)))
+
+(comment
+  (create-namespace-name "person"))
+
 (defn- create-namespaces!
   [app-names]
   (reset! bank-namespaces {})
@@ -178,12 +187,12 @@
 
 (defn- fetch-function-data
   [func-data]
-  (vals (select-keys func-data [:path :function-name :name])))
+  (multiple-get func-data (list :path :function-name :name)))
 
 (comment
   (fetch-function-data (first (_loader_test_app_data :functions))))
 
-(defn- load-app-functions!
+(defn load-app-functions!
   [func-ns functions]
   (log/info ::load-app-functions!
             (str "Loading functions under namespace: " (ns-name func-ns)))

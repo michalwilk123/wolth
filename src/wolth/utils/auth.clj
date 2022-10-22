@@ -3,7 +3,7 @@
     [wolth.db.user :refer
      [fetch-user-data save-auth-token remove-user-tokens user-token-exists?]]
     [io.pedestal.log :as log]
-    [wolth.utils.common :refer [find-first]]
+    [wolth.utils.common :refer [find-first multiple-get]]
     [wolth.utils.crypto :as crypto]
     [wolth.server.utils :as server-utils]
     [wolth.server.config :refer [def-context cursor-pool app-data-container]]
@@ -134,12 +134,17 @@
   (let [body-params (select-keys (get-in ctx [:request :json-params])
                                  [:username :password])
         app-name (ctx :app-name)]
-    (assert (= 2 (count body-params)))
-    (log/info ::token-request (str "PROVIDED DATA: " body-params))
+    (and
+      (not= 2 (count body-params))
+      (throw-wolth-exception
+        :400
+        "Need username and password to log in. Those body parameters were not provided"))
+    (log/info ::token-request
+              (str "User tried to log in: " (body-params :username)))
     (if-let [user-data (fetch-user-data (body-params :username) app-name)]
       (if (crypto/verify-password (body-params :password) (user-data :password))
-        (let [token-parts (vals (select-keys user-data
-                                             [:id :username :role :password]))
+        (let [token-parts (multiple-get user-data
+                                        [:id :username :role :password])
               jwt-token (apply build-and-save-jwt-token
                           (concat token-parts (list app-name)))]
           (assoc ctx :response {:status 200, :body {:jwt-token jwt-token}}))
