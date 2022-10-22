@@ -1,14 +1,14 @@
-(ns wolth.start                               ;; <1>
+(ns wolth.start
   (:gen-class)
-  (:require [io.pedestal.http :as http] ;; <2>
+  (:require [io.pedestal.http :as http]
             [io.pedestal.http.route :as route]
             [wolth.server.utils :refer [app-path->app-name]]
             [wolth.server.config :refer [wolth-routes]]
             [wolth.utils.loader :refer
              [load-application! test-application-file! load-user-functionalities
-              store-applications! store-db-connections! store-routes!
+              store-applications! store-db-connections! load-bank-functions!
               create-sql-tables! create-admin-account!]]
-            [wolth.server.routes :as r])) ;; <3>
+            [wolth.server.routes :as r]))
 
 (defn respond-hello
   [request]          ;; <1>
@@ -48,11 +48,13 @@
         generated-routes (r/generate-routes app-names applications)]
     (store-applications! app-names applications)
     (store-db-connections! app-names applications)
+    (load-bank-functions! app-names applications)
     (create-sql-tables! app-names applications)
     (run! (partial apply create-admin-account!) (zipmap app-names applications))
     (reset! wolth-routes generated-routes)
+    nil
     ;; (reset! wolth-routes r/route-table)
-    ))
+  ))
 
 (def _test-application-path "test/system/person/person.app.edn")
 
