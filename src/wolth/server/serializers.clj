@@ -9,15 +9,14 @@
     [wolth.server.-test-data :refer
      [_test-get-request-map _test-delete-request-map _test-patch-request-map
       _test-post-request-map _serializers_test_app_data _test-object-spec
-      _test-normalized-fields _test-json-body]]
+      _test-normalized-fields _test-json-body _test-bank-request-map]]
     [wolth.server.bank :as bank-utils]
     [wolth.db.uriql :refer
      [build-select merge-select-hsql merge-update-hsql build-update
       build-delete]]
     [wolth.server.config :refer [def-context app-data-container]]
     [wolth.db.fields :as fields]
-    [io.pedestal.http.body-params :as body-params]
-   ))
+    [io.pedestal.http.body-params :as body-params]))
 
 (def-context _test-context
              {app-data-container {"test-app" _serializers_test_app_data}})
@@ -42,7 +41,7 @@
   (let [object-fields (object-data :fields)
         [key value] field
         related-table (utils/find-first #(= (% :name) (name key))
-                                         object-fields)]
+                                        object-fields)]
     (if (nil? related-table) nil (assoc related-table :data value))))
 
 (comment
@@ -221,7 +220,7 @@
         objects-data (server-utils/get-associated-objects (app-data :objects)
                                                           tables)
         _raw-serializer-data (utils/find-first #(= serializer-name (% :name))
-                                                (get app-data :serializers))
+                                               (get app-data :serializers))
         _related-serializer-spec (server-utils/get-related-serializer-spec
                                    objects-data
                                    (_raw-serializer-data :operations)
@@ -260,16 +259,17 @@
   serialize-into-bank
   [ctx]
   (let [request-data (get ctx :request)
-        [app-name func-name] (server-utils/uri->parsed-info
-                               (get request-data :uri)
-                               (get request-data :request-method))
+        [app-name func-name]
+          (server-utils/uri->parsed-info (get request-data :uri) :bank)
         _query-params (get request-data :query-params)
         app-data (server-utils/get-associated-app-data! app-name)
         f-serializer (utils/find-first #(= (get % :name) func-name)
                                        (app-data :functions))
         params-normalized (bank-utils/normalize-params _query-params
                                                        (f-serializer :args))]
-    _query-params))
+    (assoc ctx
+      :function-data {:funtion-name func-name,
+                      :function-args params-normalized})))
 
 (comment
   (_test-context '(serialize-into-bank _test-bank-request-map)))
@@ -278,4 +278,4 @@
   {:name ::MODEL-SERIALIZER-INTERCEPTOR, :enter serialize-into-model})
 
 (def bank-serializer-interceptor
-  {:name ::BANK-SERIALIZER-INTERCEPTOR, :enter 'serialize-into-bank})
+  {:name ::BANK-SERIALIZER-INTERCEPTOR, :enter serialize-into-bank})
