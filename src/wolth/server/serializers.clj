@@ -12,7 +12,8 @@
               build-delete]]
             [wolth.server.config :refer [def-context app-data-container]]
             [wolth.db.fields :as fields]
-            [io.pedestal.http.body-params :as body-params]))
+            [io.pedestal.http.body-params :as body-params]
+            [wolth.utils.common :as common]))
 
 (def ^:private _test-serializer-spec
   {:name "public",
@@ -121,7 +122,8 @@
   [object-data field]
   (let [object-fields (object-data :fields)
         [key value] field
-        related-table (first (filter #(= (% :name) (name key)) object-fields))]
+        related-table (common/find-first #(= (% :name) (name key))
+                                         object-fields)]
     (if (nil? related-table) nil (assoc related-table :data value))))
 
 (comment
@@ -194,10 +196,11 @@
   (assert (seq? object-specs))
   (let [table-name (:name (first object-specs))
         fields (:fields (first serializer-specs))
-        attatched (:attatched (first serializer-specs))
+        attatched (:attached (first serializer-specs))
         processed-fields (as-> params it
                            (select-keys it (map keyword fields))
                            (utils/assoc-vector it attatched))]
+    ;;  (println processed-fields)
     (if-let [normalized-fields (normalize-field-associeted-w-object
                                  processed-fields
                                  object-specs
@@ -268,7 +271,7 @@
 (defn- serialize-delete
   [path-params serializer-specs objects-data]
   (let [table-name (:name (first objects-data))
-        selector (first (vals path-params))
+        selector (url-decode (first (vals path-params)))
         filter-subquery (:filter (first serializer-specs))]
     (as-> (list table-name selector filter-subquery) it
       (apply build-delete it)
@@ -298,8 +301,8 @@
         app-data (server-utils/get-associated-app-data! app-name)
         objects-data (server-utils/get-associated-objects (app-data :objects)
                                                           tables)
-        _raw-serializer-data (first (filter #(= serializer-name (% :name))
-                                      (get app-data :serializers)))
+        _raw-serializer-data (common/find-first #(= serializer-name (% :name))
+                                                (get app-data :serializers))
         _related-serializer-spec (server-utils/get-related-serializer-spec
                                    objects-data
                                    (_raw-serializer-data :operations)
@@ -334,19 +337,20 @@
    and we do not trust the end user, we have to
    validate the input ourselves
    "
-(def-interceptor-fn serialize-into-bank
-                    [ctx]
-                    (let [request-data (get ctx :request)
-                          [app-name func-name] (server-utils/uri->parsed-info
-                                                             (get request-data :uri)
-                                                             (get request-data :request-method))
-                          _query-params (get request-data :query-params)
+(def-interceptor-fn
+  serialize-into-bank
+  [ctx]
+  (let [request-data (get ctx :request)
+        [app-name func-name] (server-utils/uri->parsed-info
+                               (get request-data :uri)
+                               (get request-data :request-method))
+        _query-params (get request-data :query-params)
         app-data (server-utils/get-associated-app-data! app-name)
-                          f-serializer (utils/find-first #(= (get % :name) func-name) (app-data :functions))
-                          params-normalized (bank-utils/normalize-params _query-params (f-serializer :args))
-                          ]
-
-                      _query-params))
+        f-serializer (utils/find-first #(= (get % :name) func-name)
+                                       (app-data :functions))
+        params-normalized (bank-utils/normalize-params _query-params
+                                                       (f-serializer :args))]
+    _query-params))
 
 (comment
   (_test-context '(serialize-into-bank _test-bank-request-map)))
