@@ -4,11 +4,13 @@
             [wolth.utils.auth :as auth]
             [io.pedestal.log :as log]
             [wolth.server.serializers :as serializers]
-            [wolth.server.views :refer [model-view-interceptor]]
+            [wolth.server.views :refer
+             [model-view-interceptor function-view-interceptor]]
             [io.pedestal.interceptor :refer [interceptor]]
             [wolth.server.utils :refer [utility-interceptor]]
             [io.pedestal.http.body-params :as body-params]
-            [wolth.server.resolvers :refer [model-resolver-interceptor]]
+            [wolth.server.resolvers :refer
+             [model-resolver-interceptor model-resolver-interceptor]]
             [io.pedestal.http :as http]
             [io.pedestal.http.route :as route]
             [wolth.utils.common :as utils]))
@@ -170,26 +172,34 @@
    "
 (defn generate-routes-for-functions [app-name functions] (list))
 
+
+(defn- generate-common-utility-routes
+  [app-name]
+  (let [auth-uri (format "/%s/auth" app-name)
+        logout-uri (format "/%s/logout" app-name)]
+    (list [auth-uri :post
+           [(body-params/body-params) http/json-body utility-interceptor
+            auth/token-auth-login-interceptor] :route-name
+           (keyword (str app-name "-token-auth-request"))]
+          [logout-uri :post
+           [(body-params/body-params) http/json-body utility-interceptor
+            auth/authenticator-interceptor auth/token-auth-logout-interceptor]
+           :route-name (keyword (str app-name "-token-logout-request"))]
+          ["person/primes" :get
+           [(body-params/body-params) http/json-body utility-interceptor
+            auth/authenticator-interceptor auth/function-authorizer-interceptor
+            model-resolver-interceptor function-view-interceptor] :route-name
+           :test-function-req])))
+
 (defn generate-routes-for-app
   [app-name app-data]
-  (let [auth-uri (format "/%s/auth" app-name)
-        logout-uri (format "/%s/logout" app-name)
-        routes
-          (concat
-            (apply concat
-              (map (partial generate-routes-for-serializer app-name)
-                (get app-data :serializers)))
-            (list [auth-uri :post
-                   [(body-params/body-params) http/json-body utility-interceptor
-                    auth/token-auth-login-interceptor] :route-name
-                   (keyword (str app-name "-token-auth-request"))])
-            (list [logout-uri :post
-                   [(body-params/body-params) http/json-body utility-interceptor
-                    auth/token-auth-login-interceptor] :route-name
-                   (keyword (str app-name "-token-logout-request"))])
-            (apply concat
-              (map (partial generate-routes-for-functions app-name)
-                (get app-data :functions))))]
+  (let [routes (concat (apply concat
+                         (map (partial generate-routes-for-serializer app-name)
+                           (get app-data :serializers)))
+                       (generate-common-utility-routes app-data)
+                       (apply concat
+                         (map (partial generate-routes-for-functions app-name)
+                           (get app-data :functions))))]
     (run!
       (fn [rt]
         (let [f-string (format "Method: %s, URL: %s;" (second rt) (first rt))]
