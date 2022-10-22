@@ -1,15 +1,18 @@
 (ns wolth.utils.auth
   (:require
-    [wolth.db.user :refer [fetch-user-data save-auth-token remove-user-tokens]]
+    [wolth.db.user :refer
+     [fetch-user-data save-auth-token remove-user-tokens user-token-exists?]]
     [io.pedestal.log :as log]
+    [wolth.utils.common :refer [find-first]]
     [wolth.utils.crypto :as crypto]
     [wolth.server.utils :as server-utils]
     [wolth.server.config :refer [def-context cursor-pool app-data-container]]
-    [wolth.db.utils :refer [get-datasource-from-memory]]
     [next.jdbc :as jdbc]
     [clojure.string :as str]
-    [wolth.server.exceptions :refer [throw-wolth-exception def-interceptor-fn]]
-    [io.pedestal.http.body-params :as body-params])
+    [wolth.utils.-test-data :refer
+     [_test-request-map _auth_test_app_data _test_authenticated_ctx
+      _test_authenticated_ctx_for_functions]]
+    [wolth.server.exceptions :refer [throw-wolth-exception def-interceptor-fn]])
   (:import [java.io IOException]
            [java.time Instant]))
 
@@ -21,75 +24,10 @@
 (defonce JWT-HEADER "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")
 
 
-
-(def _test-jwt-token
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkYW0iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY0MTQ3NzI5LCJ0dGwiOjYwNDgwMH0.kv47aXxC7EbyuR_yg8EpoeRXiHfKon7MJP5LSFcyE0Y")
-
-(def _test-incorrect-jwt-token
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkYW0iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY0MTQ3NzI5LCJ0dGwiOjYwNDgwMH0.kv47aXxC7EbyuR_yg8EpoeRXiHfKon7MJP5LSFcyE0a")
-
-(def _test_authenticated_ctx
-  {:logged-user {:role "admin", :username "adam"},
-   :app-name "test-app",
-   :request
-     {:json-params {:name "Jake"},
-      :headers
-        {"accept" "*/*",
-         "user-agent" "Thunder Client (https://www.thunderclient.com)",
-         "connection" "close",
-         "host" "localhost:8002",
-         "accept-encoding" "gzip, deflate, br",
-         "content-length" "20",
-         "auth-token"
-           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkYW0iLCJyb2xlIjoiYWRtaW4iLCJjcmVhdGVkLWF0IjoxNjY0MTQ3NzI5LCJ0dGwiOjYwNDgwMH0.kv47aXxC7EbyuR_yg8EpoeRXiHfKon7MJP5LSFcyE0Y",
-         "content-type" "application/json"},
-      :path-info "/test-app/User/public",
-      :uri "/test-app/User/public",
-      :request-method :post,
-      :context-path ""}})
-
-(def _test-request-map
-  {:app-name "person",
-   :request {:json-params {:username "myAdmin", :password "admin"},
-             :headers {"accept" "*/*",
-                       "user-agent"
-                         "Thunder Client (https://www.thunderclient.com)",
-                       "connection" "close",
-                       "host" "localhost:8002",
-                       "accept-encoding" "gzip, deflate, br",
-                       "content-length" "20",
-                       "auth-token" _test-jwt-token,
-                       "content-type" "application/json"},
-             :query-string nil,
-             :path-params {},
-             :scheme :http,
-             :request-method :post,
-             :context-path ""}})
-
-(def ^:private _test-app-data
-  {:objects
-     [{:name "User",
-       :fields
-         [{:constraints [:not-null :unique], :name "username", :type :str128}
-          {:constraints [:not-null], :name "password", :type :password}
-          {:constraints [:not-null], :name "role", :type :str128}
-          {:constraints [:unique], :name "email", :type :str128}],
-       :options [:uuid-identifier]}],
-   :functions [{:name "getDate"}],
-   :serializers [{:name "public",
-                  :allowed-roles ["admin"],
-                  :operations
-                    [{:model "User",
-                      :read {:fields ["author" "content" "id"], :attached []},
-                      :update {:fields ["username" "email"]},
-                      :create {:fields ["username" "email" "password"],
-                               :attached [["role" "regular"]]},
-                      :delete true}]}]})
-
 (def-context _test-context
              {cursor-pool {"test-app" (jdbc/get-datasource
                                         {:dbtype "h2", :dbname "mydatabase"})},
-              app-data-container {"person" _test-app-data}})
+              app-data-container {"test-app" _auth_test_app_data}})
 
 (defn get-current-epoch
   "Get current date since epoch in seconds"
@@ -147,20 +85,22 @@
 
 (defn fetch-and-validate-jwt-token
   [jwt-string app-name]
-  (let [[header payload signature] (parse-jwt-safely jwt-string)]
-    (if (not= header JWT-HEADER)
-      (throw-wolth-exception :400 "Unknown wolth exception")
-      nil)
-    (let [user-data (fetch-user-data (payload :username) app-name)]
-      (if (empty? user-data)
-        (throw-wolth-exception :404
-                               (str "Cannot find user: " (payload :username)))
-        (let [calculated-jwt-string (create-jwt-string payload
-                                                       (user-data :password))
-              generated-sig (last (str/split calculated-jwt-string #"\."))]
-          (if (crypto/compare-digest generated-sig signature)
-            (dissoc user-data :password)
-            nil))))))
+  (if-not (user-token-exists? jwt-string app-name)
+    (throw-wolth-exception :401 "Authorization Error. Unknown token")
+    (let [[header payload signature] (parse-jwt-safely jwt-string)]
+      (if (not= header JWT-HEADER)
+        (throw-wolth-exception :400 "Unknown wolth exception")
+        nil)
+      (let [user-data (fetch-user-data (payload :username) app-name)]
+        (if (empty? user-data)
+          (throw-wolth-exception :404
+                                 (str "Cannot find user: " (payload :username)))
+          (let [calculated-jwt-string (create-jwt-string payload
+                                                         (user-data :password))
+                generated-sig (last (str/split calculated-jwt-string #"\."))]
+            (if (crypto/compare-digest generated-sig signature)
+              (dissoc user-data :password)
+              nil)))))))
 
 (comment
   (fetch-and-validate-jwt-token
@@ -238,16 +178,20 @@
   {:name ::AUTHENTICATOR-INTERCEPTOR, :enter authenticate-user})
 
 ; TODO: TO DZISIAJ ROBIMY
-;; (def-interceptor-fn token-logout-request [ctx] (assert false))
 #_"We expect that user is logged in and authenticated. After that we do actual
    logging out"
-(defn token-logout-request
+(def-interceptor-fn
+  token-logout-request
   [ctx]
   (if-let [user-data (ctx :logged-user)]
     (do (log/info ::token-logout-request
                   (format "User: %s is loging out" (ctx :logged-user)))
-        (remove-user-tokens (user-data :username) (ctx :app-name)))
+        (remove-user-tokens (user-data :id) (ctx :app-name))
+        (assoc ctx
+          :response {:status 200,
+                     :body {:message "User logged out successfully"}}))
     (throw-wolth-exception :403 "Cannot log out not logged in user!")))
+
 (comment
   (token-logout-request _test-request-map)
   (token-logout-request (assoc _test-request-map
@@ -279,7 +223,7 @@
         serializer-objects (serializer :operations)]
     (letfn
       [(find-related-object [table-name]
-         (first (filter (fn [x] (= (x :model) table-name)) serializer-objects)))
+         (find-first (fn [x] (= (x :model) table-name)) serializer-objects))
        (test-object-found [obj]
          (if (nil? obj)
            (throw-wolth-exception :403
@@ -316,11 +260,9 @@
         [app-name serializer-name accessed-tables]
           (server-utils/uri->parsed-info (get-in ctx [:request :uri]) :post)
         app-data (server-utils/get-associated-app-data! app-name)
-        serializer (first (filter #(= serializer-name (% :name))
-                            (app-data :serializers)))]
-    (if (nil? serializer)
-      (throw-wolth-exception :400 "Cannot find such view")
-      (println user-data))
+        serializer (find-first #(= serializer-name (% :name))
+                               (app-data :serializers))]
+    (and (nil? serializer) (throw-wolth-exception :400 "Cannot find such view"))
     (authorize-by-user-role (serializer :allowed-roles) (get user-data :role))
     (authorize-by-user-operation serializer
                                  accessed-tables
@@ -333,7 +275,23 @@
 (def model-authorizer-interceptor
   {:name ::AUTHORIZER-INTERCEPTOR, :enter authorize-user})
 
-(def-interceptor-fn function-authorize-user [ctx])
+(def-interceptor-fn
+  function-authorize-user
+  [ctx]
+  (let [user-data (get ctx :logged-user)
+        [app-name function-name]
+          (server-utils/uri->parsed-info (get-in ctx [:request :uri]) :bank)
+        app-data (server-utils/get-associated-app-data! app-name)
+        serializer (find-first #(= function-name (% :name))
+                               (app-data :functions))]
+    (and (nil? serializer)
+         (throw-wolth-exception :400 "Cannot find such function"))
+    (authorize-by-user-role (serializer :allowed-roles) (get user-data :role))
+    (assoc ctx :authorized true)))
+
+(comment
+  (_test-context '(function-authorize-user
+                   _test_authenticated_ctx_for_functions)))
 
 (def function-authorizer-interceptor
   {:name ::AUTHORIZER-INTERCEPTOR, :enter function-authorize-user})
