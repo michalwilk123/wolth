@@ -12,9 +12,9 @@
                         :body (if (coll? result)
                                 (map sql-map->map result)
                                 (sql-map->map result))}
-                  :post {:status 201, :body "Created data"}
-                  :patch {:status 200, :body "Updated data"}
-                  :delete {:status 200, :body "Deleted data"}))
+                  :post {:status 201, :body {:message "Created data"}}
+                  :patch {:status 200, :body {:message "Updated data"}}
+                  :delete {:status 200, :body {:message "Deleted data"}}))
     (assoc ctx
       :response {:status 200,
                  :body "No result from resolver, but request was successful"})))
