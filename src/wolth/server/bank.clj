@@ -31,29 +31,32 @@
 (defn normalize-params
   [params spec]
   (as-> spec it
-    (map (fn fetch-param-values [spec-item]
-           (->> spec-item
-                (first)
-                (keyword)
-                (get params)
-                ((fn [val] (if ( nil? val) (throw-wolth-exception :400 "Some required parameters were not assigned") val)))
-                (conj spec-item)))
+    (map
+      (fn fetch-param-values [spec-item]
+        (->> spec-item
+             (first)
+             (keyword)
+             (get params)
+             ((fn [val]
+                (if (nil? val)
+                  (throw-wolth-exception
+                    :400
+                    "Some required parameters were not assigned")
+                  val)))
+             (conj spec-item)))
       it)
     (map (fn normalize-value [ext-spec]
            (let [f-type (second ext-spec)
                  value (last ext-spec)]
-             (validation-successful? ( validators f-type value ))
-             ((normalizers f-type) value)
-             ))
+             (validation-successful? (validators f-type value))
+             ((normalizers f-type) value)))
       it)))
 
 (comment
   (normalize-params {:text "dsadsa", :num "123"}
                     [["num" :int] ["text" :string]])
-  (normalize-params {:num "123" :text "dsadsa" }
+  (normalize-params {:num "123", :text "dsadsa"}
                     [["num" :int] ["text" :string]])
   (normalize-params {:text "dsadsa", :num "dsadsa"}
                     [["num" :int] ["text" :string]])
-  (normalize-params {:text "dsadsa"}
-                    [["num" :int] ["text" :string]])
-  )
+  (normalize-params {:text "dsadsa"} [["num" :int] ["text" :string]]))
