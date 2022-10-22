@@ -1,6 +1,5 @@
 (ns wolth.server.bank
-  (:require [wolth.server.exceptions :refer [throw-wolth-exception]]
-            [wolth.utils.common :refer [compose]]))
+  (:require [wolth.server.exceptions :refer [throw-wolth-exception]]))
 
 
 (defn create-reg-matcher
@@ -19,9 +18,6 @@
 (def ^:private normalizers
   {:int #(Integer/parseInt %), :string identity, :float #(Float/parseFloat %)})
 
-;; (map (fn [spec-item] ( conj spec-item (get params (name (first spec-item )
-;; )))) it)))
-
 (defn- validation-successful?
   [val]
   (if-not (= val :INVALID-INPUT)
@@ -30,6 +26,7 @@
 
 (defn normalize-params
   [params spec]
+  (assert (every? string? (vals params)))
   (as-> spec it
     (map
       (fn fetch-param-values [spec-item]
@@ -48,7 +45,7 @@
     (map (fn normalize-value [ext-spec]
            (let [f-type (second ext-spec)
                  value (last ext-spec)]
-             (validation-successful? (validators f-type value))
+             (validation-successful? ((validators f-type) value))
              ((normalizers f-type) value)))
       it)))
 
