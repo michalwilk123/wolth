@@ -118,7 +118,6 @@
         processed-fields (as-> params it
                            (select-keys it (map keyword fields))
                            (utils/assoc-vector it attatched))]
-    ;;  (println processed-fields)
     (if-let [normalized-fields (normalize-field-associeted-w-object
                                  processed-fields
                                  object-specs
@@ -249,6 +248,23 @@
   (_test-context '(serialize-into-model _test-delete-request-map)))
 
 
+(defn fetch-bank-params
+  [request-data func-serializer]
+  (case (func-serializer :arg-source)
+    :query (request-data :query-params)
+    :body (request-data :json-params)
+    (throw-wolth-exception
+      :500
+      "Unknown argument source. Available options: :query / :body")))
+
+(comment
+  (fetch-bank-params
+    (_test-bank-request-map :request)
+    {:name "getDate", :arg-source :query, :args [["num" :int]]})
+  (fetch-bank-params
+    (_test-bank-request-map :request)
+    {:name "getDate", :arg-source :body, :args [["num" :int]]}))
+
 #_"Below interceptor fetches and VALIDATES PARAMETERS
    This is the diffrence between model and bank serializer.
    Because the data is not created by the app creator 
@@ -261,14 +277,14 @@
   (let [request-data (get ctx :request)
         [app-name func-name]
           (server-utils/uri->parsed-info (get request-data :uri) :bank)
-        _query-params (get request-data :query-params)
         app-data (server-utils/get-associated-app-data! app-name)
         f-serializer (utils/find-first #(= (get % :name) func-name)
                                        (app-data :functions))
-        params-normalized (bank-utils/normalize-params _query-params
+        params (fetch-bank-params request-data f-serializer)
+        params-normalized (bank-utils/normalize-params params
                                                        (f-serializer :args))]
     (assoc ctx
-      :function-data {:funtion-name func-name,
+      :function-data {:function-name func-name,
                       :function-args params-normalized})))
 
 (comment

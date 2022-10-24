@@ -91,7 +91,7 @@
 
 (def _test-bank-request-map
   {:logged-user {:username "Przemek", :id 22222},
-   :request {:json-params {},
+   :request {:json-params {:test-val "123"},
              :uri "/test-app/getDate",
              :query-params {:num "50"},
              :request-method :delete}})
