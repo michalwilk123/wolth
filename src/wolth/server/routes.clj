@@ -4,29 +4,13 @@
             [wolth.utils.auth :as auth]
             [io.pedestal.log :as log]
             [wolth.server.serializers :as serializers]
-            [wolth.server.views :refer
-             [model-view-interceptor function-view-interceptor]]
-            [io.pedestal.interceptor :refer [interceptor]]
+            [wolth.server.views :refer [wolth-view-interceptor]]
             [wolth.server.utils :refer [utility-interceptor]]
             [io.pedestal.http.body-params :as body-params]
-            [wolth.server.resolvers :refer
-             [model-resolver-interceptor model-resolver-interceptor]]
+            [wolth.server.resolvers :refer [wolth-resolver-interceptor]]
             [io.pedestal.http :as http]
-            [io.pedestal.http.route :as route]
-            [wolth.utils.common :as utils]))
+            [io.pedestal.http.route :as route]))
 
-
-
-(def routes '[[:hello ["/hello-world" {:get hello-world}]]])
-
-(defn hello-world [req] {:status 200, :body "EJSDNJDSANK Worlddjdjd"})
-
-(defn example [req] {:status 200, :body "JESTEM ENDPOINTEM"})
-
-(defn hello
-  [ctx]
-  (log/error :BBBB "NIE ODPALA SIE")
-  {:status 200, :body (str "AAAAA" ctx)})
 
 (def ii
   {:name ::DSAKDNS,
@@ -39,7 +23,6 @@
                                                   :request]))}))})
 
 (defn test-resp [ctx] {:status 200, :body "OK"})
-
 
 (def route-table
   (route/expand-routes
@@ -55,12 +38,12 @@
       ["/person/Person/public" :post
        [(body-params/body-params) http/json-body utility-interceptor
         auth/authenticator-interceptor auth/model-authorizer-interceptor
-        model-view-interceptor] :route-name :nazwa-posta-routa]
+        wolth-view-interceptor] :route-name :nazwa-posta-routa]
       ["/person/User/:id/user-admin" :get
        [(body-params/body-params) http/json-body utility-interceptor
         auth/authenticator-interceptor auth/model-authorizer-interceptor
-        serializers/model-serializer-interceptor model-resolver-interceptor
-        model-view-interceptor] :route-name :czytanie-zwyklego-usera]
+        serializers/model-serializer-interceptor wolth-resolver-interceptor
+        wolth-view-interceptor] :route-name :czytanie-zwyklego-usera]
       ["/person/User/user-regular" :post
        [(body-params/body-params) http/json-body utility-interceptor
         auth/authenticator-interceptor auth/model-authorizer-interceptor
@@ -113,7 +96,7 @@
                       utility-interceptor auth/authenticator-interceptor
                       auth/model-authorizer-interceptor
                       serializers/model-serializer-interceptor
-                      model-resolver-interceptor model-view-interceptor]]
+                      wolth-resolver-interceptor wolth-view-interceptor]]
     (cond-> (list)
       (get serializer-operation :read)
         (conj [select-uri :get interceptors :route-name
@@ -185,18 +168,18 @@
            [(body-params/body-params) http/json-body utility-interceptor
             auth/authenticator-interceptor auth/token-auth-logout-interceptor]
            :route-name (keyword (str app-name "-token-logout-request"))]
-          ["person/primes" :get
+          ["/person/getPrimes" :get
            [(body-params/body-params) http/json-body utility-interceptor
             auth/authenticator-interceptor auth/function-authorizer-interceptor
-            model-resolver-interceptor function-view-interceptor] :route-name
-           :test-function-req])))
+            serializers/bank-serializer-interceptor wolth-resolver-interceptor
+            wolth-view-interceptor] :route-name :test-function-req])))
 
 (defn generate-routes-for-app
   [app-name app-data]
   (let [routes (concat (apply concat
                          (map (partial generate-routes-for-serializer app-name)
                            (get app-data :serializers)))
-                       (generate-common-utility-routes app-data)
+                       (generate-common-utility-routes app-name)
                        (apply concat
                          (map (partial generate-routes-for-functions app-name)
                            (get app-data :functions))))]
