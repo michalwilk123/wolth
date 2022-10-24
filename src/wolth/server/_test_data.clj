@@ -1,4 +1,5 @@
-(ns wolth.server.-test-data)
+(ns wolth.server.-test-data
+  (:require [wolth.utils.loader :refer [create-namespace-name]]))
 
 
 ; =============== TEST DATA FOR utils.clj ================ START
@@ -91,8 +92,8 @@
 (def _test-bank-request-map
   {:logged-user {:username "Przemek", :id 22222},
    :request {:json-params {},
-             :uri "/test-app/User/*/public",
-             :query-params {:num 50},
+             :uri "/test-app/getDate",
+             :query-params {:num "50"},
              :request-method :delete}})
 
 (def _serializers_test_app_data
@@ -104,7 +105,12 @@
           {:constraints [:not-null], :name "role", :type :str128}
           {:constraints [:unique], :name "email", :type :str128}],
        :options [:uuid-identifier]}],
-   :functions [{:name "getDate"}],
+   :functions [{:allowed-roles ["admin"],
+                :function-name "datefunc",
+                :name "getDate",
+                :method :get,
+                :arg-source :query,
+                :args [["num" :int]]}],
    :serializers [{:name "public",
                   :allowed-roles ["admin"],
                   :operations [{:model "User",
@@ -121,7 +127,7 @@
 
 ; =============== TEST DATA FOR resolvers.clj ================ START
 
-(def _resolver_serializer_test_data
+(def _resolver_model_ctx_test_data
   {:json-params
      {:username "Mariusz", :password "haslo", :email "mariusz@gmail.com"},
    :protocol "HTTP/1.1",
@@ -153,5 +159,24 @@
    :scheme :http,
    :request-method :post,
    :context-path ""})
+
+(def _resolver_test_function_data
+  [{:allowed-roles ["admin"],
+    :function-name "dateFunc",
+    :name "getDate",
+    :path "functions/datesCode.clj",
+    :args [["num" :int]]}])
+
+(def _resolver_func_test_namespace
+  (create-ns (create-namespace-name "test-app")))
+
+(def _resolver_func_ctx_test_data
+  {:logged-user {:username "Przemek", :id 22222},
+   :app-name "test-app",
+   :request {:json-params {},
+             :uri "/test-app/getDate",
+             :query-params {:num "50"},
+             :request-method :delete},
+   :function-data {:function-name "getDate", :function-args '(50)}})
 
 ; =============== TEST DATA FOR resolvers.clj ================ END

@@ -1,6 +1,8 @@
 {:functions [{:allowed-roles ["admin"],
+              :arg-source :query,
               :args [["num" :int]],
               :function-name "nPrimes2",
+              :method :get,
               :name "getPrimes",
               :path "functions/clojureFunction.clj"}],
  :meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
