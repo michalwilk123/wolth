@@ -24,7 +24,7 @@
   (clojure.walk/macroexpand-all '(def-token numer #"cxzcxzcxz" "dsads")))
 
 (def-token fieldToken #"[A-Za-z]+[0-9]*")
-(def-token valueToken #"[A-Za-z0-9]+")
+(def-token valueToken #"[A-Za-z0-9\- ]+")
 (def-token detailToken fieldToken "=" valueToken)
 (def-token allToken #"\*")
 (def-token sortDirToken #"(<<)|(>>)")
@@ -74,6 +74,7 @@
   (token-found? fullFilterQueryExpr "(name==Adam$and$surname<>kowalski)" :exact)
   (token-found? fullFilterQueryExpr "name==Adam" :exact)
   (token-found? fullFilterQueryExpr "<<name" :exact)
+  (token-found? fullFilterQueryExpr "id==58 123-121-233" :exact)
   (str/replace "name==Adam$and$age>10" fullFilterQueryExpr "QQQ")
   (re-matches #"(?<dsads>(<|>|(<=))+)" "<<<="))
 
