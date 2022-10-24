@@ -1,34 +1,56 @@
 (ns wolth.server.views
   (:require [wolth.server.exceptions :refer [def-interceptor-fn]]
+            [clojure.spec.alpha :as s]
             [wolth.utils.common :refer [sql-map->map]]))
 
-(def-interceptor-fn
-  model-view-interceptor-fn
+
+(defn create-model-view
   [ctx]
-  (if-let [result (get ctx :result)]
-    (assoc ctx
-      :response (case (get-in ctx [:request :request-method])
-                  :get {:status 200,
-                        :body (if (coll? result)
-                                (map sql-map->map result)
-                                (sql-map->map result))}
-                  :post {:status 201, :body {:message "Created data"}}
-                  :patch {:status 200, :body {:message "Updated data"}}
-                  :delete {:status 200, :body {:message "Deleted data"}}))
-    (assoc ctx
-      :response {:status 200,
-                 :body "No result from resolver, but request was successful"})))
+  (let [result (get ctx :model-result)
+        request-method (get-in ctx [:request :request-method])
+        response (case request-method
+                   :get {:status 200,
+                         :body (if (coll? result)
+                                 (map sql-map->map result)
+                                 (sql-map->map result))}
+                   :post {:status 201, :body {:message "Created data"}}
+                   :patch {:status 200, :body {:message "Updated data"}}
+                   :delete {:status 200, :body {:message "Deleted data"}})]
+    (assoc ctx :response response)))
 
-(def-interceptor-fn function-view-interceptor-fn
+(s/def ::body
+  (s/or :a map?
+        :b vector?
+        :c number?
+        :d string?
+        :e nil?))
+
+(s/def ::status (s/int-in 100 600))
+
+(s/def ::result-object (s/and map? (s/keys :req-un [::body ::status])))
+
+(comment
+  (s/valid? ::result-object {:status 200, :body "OK"})
+  (s/valid? ::result-object "OKEJ")
+  (s/explain ::result-object "OKEJ")
+  (s/valid? ::result-object {:status 1000, :body (fn [x] x)})
+  (s/explain ::result-object {:status 1000, :body (fn [x] x)}))
+
+(defn create-bank-view
+  [ctx]
+  (let [result (ctx :bank-result)]
+    (if (s/valid? ::result-object result)
+      (assoc ctx :response result)
+      (assoc ctx :response {:status 200, :body result}))))
+
+(def-interceptor-fn view-interceptor-fn
                     [ctx]
-                    (if (get ctx :result)
-                      (assoc ctx
-                        :response {:status 200, :body (get ctx :result)})
-                      (assoc ctx :response {:status 204})))
+                    (cond (get ctx :bank-result) (create-bank-view ctx)
+                          (get ctx :model-result) (create-model-view ctx)
+                          :else (assoc ctx :response {:status 204, :body nil})))
 
-(def model-view-interceptor
-  {:name ::WOLTH-VIEW-INTERCEPTOR, :enter model-view-interceptor-fn})
 
-(def function-view-interceptor
-  {:name ::WOLTH-VIEW-INTERCEPTOR, :enter function-view-interceptor-fn})
+(def wolth-view-interceptor
+  {:name ::VIEW-INTERCEPTOR, :enter view-interceptor-fn})
+
 
