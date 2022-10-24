@@ -67,7 +67,9 @@
   {:functions [{:funcName "timeSince",
                 :name "daysSince",
                 :allowed-roles true,
-                :type :java}
+                :args [["value"] :int],
+                :method :post,
+                :arg-source :body}
                {:funcName "nPrimes2",
                 :name "primes",
                 :path "clojureFunction",
@@ -149,12 +151,31 @@
   (generate-routes-for-serializer "person"
                                   (get-in _test-app-data [:serializers 0])))
 
-#_"
-   1. Sprawdzam gdzie jest funkcja w konfiguracji
-   2. Ładuje funkcje w namespace-ie pod odpowiednim miejsce
-   "
-(defn generate-routes-for-functions [app-name functions] (list))
+(defn generate-routes-for-functions
+  [app-name function-app-data]
+  (assert (vector? function-app-data))
+  (let [func-interceptors (vector (body-params/body-params)
+                                  http/json-body
+                                  utility-interceptor
+                                  auth/authenticator-interceptor
+                                  auth/function-authorizer-interceptor
+                                  serializers/bank-serializer-interceptor
+                                  wolth-resolver-interceptor
+                                  wolth-view-interceptor)]
+    (map
+      (fn [fun-data]
+        (let [url-name (format "/%s/%s" app-name (fun-data :name))
+              route-name (keyword (format "%s-func-%s" app-name (fun-data :name)) )
+              function-method (fun-data :method)]
+          (vector url-name
+                  function-method
+                  func-interceptors
+                  :route-name
+                  route-name)))
+      function-app-data)))
 
+(comment
+  (generate-routes-for-functions "test-app" (_test-app-data :functions)))
 
 (defn- generate-common-utility-routes
   [app-name]
@@ -167,12 +188,7 @@
           [logout-uri :post
            [(body-params/body-params) http/json-body utility-interceptor
             auth/authenticator-interceptor auth/token-auth-logout-interceptor]
-           :route-name (keyword (str app-name "-token-logout-request"))]
-          ["/person/getPrimes" :get
-           [(body-params/body-params) http/json-body utility-interceptor
-            auth/authenticator-interceptor auth/function-authorizer-interceptor
-            serializers/bank-serializer-interceptor wolth-resolver-interceptor
-            wolth-view-interceptor] :route-name :test-function-req])))
+           :route-name (keyword (str app-name "-token-logout-request"))])))
 
 (defn generate-routes-for-app
   [app-name app-data]
@@ -180,9 +196,8 @@
                          (map (partial generate-routes-for-serializer app-name)
                            (get app-data :serializers)))
                        (generate-common-utility-routes app-name)
-                       (apply concat
-                         (map (partial generate-routes-for-functions app-name)
-                           (get app-data :functions))))]
+                         (generate-routes-for-functions app-name
+                           (get app-data :functions)))]
     (run!
       (fn [rt]
         (let [f-string (format "Method: %s, URL: %s;" (second rt) (first rt))]
