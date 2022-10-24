@@ -47,3 +47,6 @@
   (s/explain ::objects aaa) ; this is for debug / user messages
   (s/valid? ::objects aaa) ; this is for validation (outputs boolean)
 )
+
+; TODO: Spec should be filled and the app structure tested
+(defn test-app-structure [app-data] nil)

@@ -60,6 +60,7 @@
                  #(conj % user/user-admin-view user/user-regular-view))))
 
 (comment
+  #_{:clj-kondo/ignore [:unresolved-namespace]}
   (clojure.pprint/pprint (load-user-functionalities _loader_test_app_data)))
 
 (defn store-applications!

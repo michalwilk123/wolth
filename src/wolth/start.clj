@@ -52,9 +52,7 @@
     (create-sql-tables! app-names applications)
     (run! (partial apply create-admin-account!) (zipmap app-names applications))
     (reset! wolth-routes generated-routes)
-    nil
-    ;; (reset! wolth-routes r/route-table)
-  ))
+    nil))
 
 (def _test-application-path "test/system/person/person.app.edn")
 
