@@ -15,7 +15,7 @@
              [cursor-pool app-data-container bank-namespaces]]
             [io.pedestal.log :as log]))
 
-(defonce WOLTH-GENERATED-NS-PREFIX (str (rand-string 8) "--funcs"))
+(defonce WOLTH-GENERATED-NS-PREFIX (str "--" (rand-string 8) "-funcs"))
 
 (defn throw-loader-exception
   [reason]
@@ -152,9 +152,20 @@
 (comment
   (create-namespace-name "person"))
 
+(defn- remove-namespaces!
+  []
+  (run! (fn [bank-ns]
+          (-> bank-ns
+              (ns-name)
+              (remove-ns)))
+        (vals @bank-namespaces))
+  (reset! bank-namespaces {}))
+
+(comment
+  (remove-namespaces!))
+
 (defn- create-namespaces!
   [app-names]
-  (reset! bank-namespaces {})
   (run!
     (fn [single-app-name]
       (let [str-namespace (str WOLTH-GENERATED-NS-PREFIX "-" single-app-name)
@@ -167,6 +178,8 @@
 (comment
   (create-namespaces! (list "application1" "app2"))
   @bank-namespaces
+  (intern (@bank-namespaces "application1") 'abc "test data 123")
+  --FyYrskXL-funcs-application1/abc
   (reset! bank-namespaces {}))
 
 (defn- load-under-ns!
@@ -218,6 +231,7 @@
 
 (defn load-bank-functions!
   [app-names app-datas]
+  (remove-namespaces!)
   (create-namespaces! app-names)
   (let [app-functions (map :functions app-datas)
         app-namespaces (map @bank-namespaces app-names)]
