@@ -1,6 +1,5 @@
 (ns wolth.db.user
-  (:require [wolth.db.models :as models]
-            [wolth.db.utils :refer [execute-sql-expr!]]
+  (:require [wolth.db.utils :refer [execute-sql-expr!]]
             [io.pedestal.log :as log]
             [next.jdbc :as jdbc]
             [wolth.server.config :refer [def-context cursor-pool]]
@@ -51,15 +50,6 @@
                           :filter [:= "id" :user-id]},
                  :model "User",
                  :delete {:filter [:= "id" :user-id]}}]})
-
-(defn format-sql-response [sql-resp])
-
-(comment
-  (format-sql-response [#:USER{:ID "fcb25ade-b382-4d0d-9b69-773b0918db30",
-                         :USERNAME "myAdmin",
-                         :PASSWORD "aaaa",
-                         :ROLE "admin",
-                         :EMAIL nil}]))
 
 (defn fetch-user-data
   [username app-name]
