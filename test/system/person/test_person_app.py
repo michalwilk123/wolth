@@ -19,7 +19,6 @@ async def http_client():
 
 
 @pytest.mark.asyncio
-# @pytest_asyncio.fixture
 async def test_create_user(http_client):
     TEST_NAME = "Adam"
     TEST_PASSWORD = "password"
@@ -38,6 +37,13 @@ async def test_create_user(http_client):
     ) as resp:
         assert resp.status == 403
 
+    async with http_client.delete(
+        BASE_URL + f"/User/role<>admin/user-admin",
+        headers={"auth-token": token},
+    ) as resp:
+        assert resp.status == 200
+        payload = await resp.json()
+
     async with http_client.post(
         BASE_URL + "/User/user-admin",
         json={"username": TEST_NAME, "password": TEST_PASSWORD, "email": TEST_MAIL, "role": "regular"},
@@ -45,26 +51,58 @@ async def test_create_user(http_client):
     ) as resp:
         assert resp.status == 201
         payload = await resp.json()
-        print(f"{payload=}")
 
     async with http_client.get(
-        BASE_URL + f"/User/username={TEST_NAME}/user-admin",
+        BASE_URL + f"/User/username=={TEST_NAME}/user-admin",
         headers={"auth-token": token},
     ) as resp:
         assert resp.status == 200
         payload = await resp.json()
-        print(f"{payload=}")
-        user_id = payload.get("id")
+        user_id = payload[0].get("id")
 
     async with http_client.delete(
-        BASE_URL + f"/User/{user_id}/user-admin",
+        BASE_URL + f"/User/id=={user_id}/user-admin",
         headers={"auth-token": token},
-    ):
+    ) as resp:
         assert resp.status == 200
         payload = await resp.json()
-        print(f"{payload=}")
+
+    async with http_client.post(
+        BASE_URL + "/logout",
+        headers={"auth-token": token},
+    ) as resp:
+        assert resp.status == 200
+        payload = await resp.json()
 
 
-# @pytest.mark.asyncio
-# async def test_create_users(test_create_user):
-#     ...
+@pytest.mark.asyncio
+async def test_function_view(http_client):
+    async with http_client.post(
+        BASE_URL + "/auth",
+        json={"username": ADMIN_UNAME, "password": ADMIN_PASSWORD},
+    ) as resp:
+        assert resp.status == 200
+        token = ( await resp.json() ).get("jwt-token")
+
+    async with http_client.get(
+        BASE_URL + "/getPrimes",
+        headers={"auth-token": token},
+        params={"num": "lalalala"}
+    ) as resp:
+        assert resp.status == 400
+
+    async with http_client.get(
+        BASE_URL + "/getPrimes",
+        headers={"auth-token": token},
+        params={"num": 10}
+    ) as resp:
+        assert resp.status == 200
+        payload = await resp.json()
+        assert len(payload)
+
+
+    async with http_client.post(
+        BASE_URL + "/logout",
+        headers={"auth-token": token},
+    ) as resp:
+        assert resp.status == 200
