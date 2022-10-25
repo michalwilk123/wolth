@@ -4,7 +4,6 @@
     [wolth.server.exceptions :refer [throw-wolth-exception def-interceptor-fn]]
     [honey.sql :as sql]
     [ring.util.codec :refer [url-decode]]
-    [io.pedestal.log :as log]
     [wolth.server.utils :as server-utils]
     [wolth.server.-test-data :refer
      [_test-get-request-map _test-delete-request-map _test-patch-request-map
@@ -15,8 +14,7 @@
      [build-select merge-select-hsql merge-update-hsql build-update
       build-delete]]
     [wolth.server.config :refer [def-context app-data-container]]
-    [wolth.db.fields :as fields]
-    [io.pedestal.http.body-params :as body-params]))
+    [wolth.db.fields :as fields]))
 
 (def-context _test-context
              {app-data-container {"test-app" _serializers_test_app_data}})

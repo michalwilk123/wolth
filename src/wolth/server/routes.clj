@@ -165,7 +165,8 @@
     (map
       (fn [fun-data]
         (let [url-name (format "/%s/%s" app-name (fun-data :name))
-              route-name (keyword (format "%s-func-%s" app-name (fun-data :name)) )
+              route-name (keyword
+                           (format "%s-func-%s" app-name (fun-data :name)))
               function-method (fun-data :method)]
           (vector url-name
                   function-method
@@ -196,8 +197,9 @@
                          (map (partial generate-routes-for-serializer app-name)
                            (get app-data :serializers)))
                        (generate-common-utility-routes app-name)
-                         (generate-routes-for-functions app-name
-                           (get app-data :functions)))]
+                       (generate-routes-for-functions app-name
+                                                      (get app-data
+                                                           :functions)))]
     (run!
       (fn [rt]
         (let [f-string (format "Method: %s, URL: %s;" (second rt) (first rt))]

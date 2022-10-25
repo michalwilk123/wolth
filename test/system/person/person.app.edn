@@ -21,9 +21,11 @@
  :serializers
    [{:allowed-roles ["admin"],
      :name "public",
-     :operations
-       [{:create {:attached [["note" "Testowa notatka"]], :fields ["name"]},
-         :delete true,
-         :model "Person",
-         :read {:fields ["name" "note" "id"], :filter [:= "author" :user-id]},
-         :update {:fields ["name"]}}]}]}
+     :operations [{:create
+                     {:attached [["note" "Testowa notatka"]], :fields ["name"]},
+                   :delete true,
+                   :model "Person",
+                   :read {:fields ["name" "note" "id"],
+                          :filter [:= "author" :user-id],
+                          :join-with ["Post"]},
+                   :update {:fields ["name"]}}]}]}
