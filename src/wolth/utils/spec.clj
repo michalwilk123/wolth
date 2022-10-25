@@ -7,15 +7,14 @@
 (s/def ::type (partial contains? help/field-lut))
 (s/def ::constaints
   (s/and vector? (s/coll-of (partial contains? help/constraints-lut))))
-(s/def ::ref-type (partial help/vector-contains? help/availiable-relationships))
+(s/def ::rel-type (partial help/vector-contains? help/availiable-relationships))
 (s/def ::references string?)
-(s/def ::related-name string?)
 
 
 (s/def ::wolth-table-field
   (s/keys :req-un [::name ::type] :opt-un [::constaints]))
 (s/def ::wolth-table-relation
-  (s/keys :req-un [::name ::ref-type ::references] :opt-un [::related-name]))
+  (s/keys :req-un [::name ::rel-type ::references]))
 
 (s/def ::fields (s/and vector? (s/coll-of ::wolth-table-field)))
 (s/def ::relations (s/and vector? (s/coll-of ::wolth-table-relation)))
@@ -39,9 +38,9 @@
     :name "Post",
     :options [:uuid-identifier],
     :relations [{:name "author",
-                 :ref-type :o2m,
+                 :rel-type :o2m,
                  :references "Person",
-                 :related-name "posts"}]}])
+                 }]}])
 
 (comment
   (s/explain ::objects aaa) ; this is for debug / user messages

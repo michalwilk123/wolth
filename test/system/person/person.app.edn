@@ -14,9 +14,9 @@
             :name "Post",
             :options [:uuid-identifier],
             :relations [{:name "author",
-                         :ref-type :o2m,
+                         :rel-type :o2m,
                          :references "Person",
-                         :related-name "posts"}]}],
+                         }]}],
  :persistent-db {:dbname "mydatabase", :dbtype "h2"},
  :serializers
    [{:allowed-roles ["admin"],
@@ -27,5 +27,7 @@
                    :model "Person",
                    :read {:fields ["name" "note" "id"],
                           :filter [:= "author" :user-id],
-                          :join-with ["Post"]},
+                          :join-with [{:model "Post" :relation-field "author"}]},
                    :update {:fields ["name"]}}]}]}
+
+;; /app/Person/*/Post/*/Comennts/*/public
