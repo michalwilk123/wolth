@@ -136,9 +136,9 @@
         filter-subqueries (map :filter serializer-specs)
         object-names (map #(get % :name) objects-data)
         queries (map url-decode (vals path-params))]
-    (as-> (utils/zip object-names queries filter-subqueries serializer-fields)
+    (println serializer-fields)
+    (as-> (map build-select object-names queries filter-subqueries serializer-fields)
       it
-      (map (partial apply build-select) it)
       (merge-select-hsql it)
       (sql/format it))))
 
