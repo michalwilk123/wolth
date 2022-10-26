@@ -30,10 +30,8 @@
              {:fields [{:name "content", :type :text}],
               :name "Post",
               :options [:uuid-identifier],
-              :relations [{:name "author",
-                           :rel-type :o2m,
-                           :references "Person",
-                           }]}],
+              :relations
+                [{:name "author", :rel-type :o2m, :references "Person"}]}],
    :persistent-db {:dbname "mydatabase", :dbtype "h2"},
    :serializers [{:allowed-roles ["public"],
                   :name "public",

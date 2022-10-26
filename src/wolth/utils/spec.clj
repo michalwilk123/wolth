@@ -13,8 +13,7 @@
 
 (s/def ::wolth-table-field
   (s/keys :req-un [::name ::type] :opt-un [::constaints]))
-(s/def ::wolth-table-relation
-  (s/keys :req-un [::name ::rel-type ::references]))
+(s/def ::wolth-table-relation (s/keys :req-un [::name ::rel-type ::references]))
 
 (s/def ::fields (s/and vector? (s/coll-of ::wolth-table-field)))
 (s/def ::relations (s/and vector? (s/coll-of ::wolth-table-relation)))
@@ -37,10 +36,7 @@
    {:fields [{:name "content", :type :text}],
     :name "Post",
     :options [:uuid-identifier],
-    :relations [{:name "author",
-                 :rel-type :o2m,
-                 :references "Person",
-                 }]}])
+    :relations [{:name "author", :rel-type :o2m, :references "Person"}]}])
 
 (comment
   (s/explain ::objects aaa) ; this is for debug / user messages
