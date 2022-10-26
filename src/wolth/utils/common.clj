@@ -148,3 +148,29 @@
   (multiple-get {:aaa 123, :bbb 999, :ccc 1000, :ddd 1001}
                 [:bbb :ccc :aaa :ddd])
   (multiple-get {:aaa 123, :bbb 999, :ccc 1000, :ddd 1001} [:ddd :bbb]))
+
+
+(defn concatv [vecs] (into [] (apply concat vecs)))
+
+(comment
+  (concatv (list [1 2 3 4] [11 222 33 44 55]))
+  (concatv (list [1 2 3 4] nil)))
+
+(defn concat-vec-field-in-maps
+  [map-objs kw]
+  (->> map-objs
+       (map (fn [el] (get el kw)))
+       (map (fn [item]
+              (if (or (sequential? item) (nil? item)) item (list item))))
+       (apply concat)
+       (into [])))
+
+(comment
+  (concat-vec-field-in-maps (list {:uu [1122 33],
+                                   :abc ["aaa" "bb" "cc" "dd" "ee"]}
+                                  {:abc [1 2 3 4 5], :pp 123}
+                                  {:mm 33})
+                            :abc)
+  (concat-vec-field-in-maps
+    (list {:uu [1122 33], :abc :lalala} {:abc [1 2 3 4 5], :pp 123} {:mm 33})
+    :abc))

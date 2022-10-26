@@ -3,7 +3,8 @@
             clojure.walk
             [honey.sql.helpers :as h]
             [wolth.server.exceptions :refer [throw-wolth-exception]]
-            [wolth.utils.common :refer [get-first-matching-pred zip]]
+            [wolth.utils.common :refer
+             [get-first-matching-pred concat-vec-field-in-maps concatv]]
             [wolth.db.fields :as fields]))
 
 
@@ -216,15 +217,14 @@
   (let [field (second query)]
     (if (or (keyword? field) allow-string-fields)
       (assoc query 1 (keyword (str table-name "." (name field))))
-      (into []
-            (map (fn [x]
-                   (if (vector? x)
-                     (hydrate-filter-query-w-table-name x
-                                                        table-name
-                                                        :allow-string-fields
-                                                        allow-string-fields)
-                     x))
-              query)))))
+      (mapv (fn [x]
+              (if (vector? x)
+                (hydrate-filter-query-w-table-name x
+                                                   table-name
+                                                   :allow-string-fields
+                                                   allow-string-fields)
+                x))
+        query))))
 
 (comment
   (hydrate-filter-query-w-table-name [:= :name "Adam"] "Person")
@@ -317,7 +317,10 @@
             [:>= :cc "10"]] [:= :aa "bb"]]})
 
 (def test-select-query-2
-  {:select :*, :from :SecondTable, :where [:<> :role "admin"]})
+  {:select :*,
+   :from :SecondTable,
+   :where [:<> :role "admin"],
+   :order-by [[:name :desc] [:age :asc]]})
 
 (defn concat-as-keyword
   [as-clause kw]
@@ -350,6 +353,14 @@
                   :else item))]
     (update-in query [:where] build-where-cl)))
 
+(defn hydrate-sort-clause
+  [as-kw query]
+  (update-in query
+             [:order-by]
+             (partial
+               mapv
+               (fn [sort-q]
+                 (update-in sort-q [0] (partial concat-as-keyword as-kw))))))
 
 (defn hydrate-set-clause [as-kw query])
 
@@ -357,7 +368,8 @@
   (hydrate-from-clause "AS_TEST" test-select-query-1)
   (hydrate-fields-clause "AS_TEST" test-select-query-1)
   (hydrate-where-clause "AS_TEST" test-select-query-1)
-  (hydrate-where-clause "AS_TEST" test-select-query-2))
+  (hydrate-where-clause "AS_TEST" test-select-query-2)
+  (hydrate-sort-clause "AS_TEST" test-select-query-2))
 
 #_" We hydrate each query with AS TABLE clause.
    We change the strategy of the hydration depanding on the query type.
@@ -368,11 +380,13 @@
   (let [-hydrate-from-clause (partial hydrate-from-clause as-name)
         -hydrate-fields-clause (partial hydrate-fields-clause as-name)
         -hydrate-where-clause (partial hydrate-where-clause as-name)
-        -hydrate-set-clause (partial hydrate-set-clause as-name)]
+        -hydrate-set-clause (partial hydrate-set-clause as-name)
+        -hydrate-sort-clause (partial hydrate-sort-clause as-name)]
     (case (first (keys query))
       :select ((comp -hydrate-from-clause
                      -hydrate-fields-clause
-                     -hydrate-where-clause)
+                     -hydrate-where-clause
+                     -hydrate-sort-clause)
                 query)
       :update ((comp -hydrate-from-clause
                      -hydrate-fields-clause
@@ -385,20 +399,78 @@
   (hydrate-query-with-as-clause test-select-query-1 "TEST")
   (hydrate-query-with-as-clause test-select-query-2 "TEST"))
 
-;; (defn- join-hydrated-queries [queries join-fields]
-;;   )
+(defn- hydrate-join-fields
+  [fields as-names table-names]
+  (letfn
+    [(-hydrate-fields [names fields tab-name]
+       (merge fields
+              {:join-with (mapv concat-as-keyword names (fields :join-with)),
+               :tab-data (vector tab-name
+                                 (-> names
+                                     (second)
+                                     (keyword)))}))]
+    (map -hydrate-fields (partition 2 1 as-names) fields (rest table-names))))
+
+(comment
+  (hydrate-join-fields (list {:join-with [:id :author], :strategy :left})
+                       (list "T1" "T2")
+                       (list :User :Task))
+  (hydrate-join-fields (list {:join-with [:id :assignmentId], :strategy :left}
+                             {:join-with [:classId :id], :strategy :inner})
+                       (list "T1" "T2" "T3")
+                       (list :User :Assignment :Class)))
+
+(defn- merge-select-simple
+  [queries]
+  {:select (concat-vec-field-in-maps queries :select),
+   :from (first (map :from queries)),
+   :order-by (concat-vec-field-in-maps queries :order-by)})
+
+(defn- join-map-to-clause
+  [join-data]
+  [(join-data :tab-data) (into [:=] (join-data :join-with))])
+
+(comment
+  (join-map-to-clause
+    {:join-with [:T1.id :T2.author], :strategy :left, :tab-data [:Task :T2]}))
+
+(defn- hydrate-queries-with-joins
+  [join-fields query]
+  (letfn [(strategy-match-fn-gen [strategy]
+            (fn [item] (= (:strategy item) strategy)))
+          (fetch-fields-by-strategy [strategy]
+            (as-> (strategy-match-fn-gen strategy) it (filter it join-fields)))]
+    (let [l-joins (fetch-fields-by-strategy :left)
+          inner-joins (fetch-fields-by-strategy :left)]
+      (cond-> query
+        (not-empty l-joins) (assoc :left-join
+                              (concatv (map join-map-to-clause l-joins)))
+        (not-empty inner-joins)
+          (assoc :join (concatv (mapv join-map-to-clause inner-joins)))))))
+
+(comment
+  (hydrate-queries-with-joins (list {:join-with [:T1.id :T2.author],
+                                     :strategy :left,
+                                     :tab-data [:SecondTable :T2]}
+                                    {:join-with [:T2.id :T3.field],
+                                     :strategy :left,
+                                     :tab-data [:ThirdTable :T3]})
+                              {}))
 
 (defn join-queries
   [queries join-fields]
   (assert (= (count queries) (inc (count join-fields))))
   (let [as-kws (take (count queries) (map #(str "T" %) (iterate inc 1)))
-        hydrated-queries (map (partial apply hydrate-query-with-as-clause)
-                           (zip queries as-kws))]
-    hydrated-queries))
+        table-names (map :from queries)
+        hydrated-queries (map hydrate-query-with-as-clause queries as-kws)
+        hydrated-fields (hydrate-join-fields join-fields as-kws table-names)]
+    (->> hydrated-queries
+         (merge-select-simple)
+         (hydrate-queries-with-joins hydrated-fields))))
 
 (comment
   (join-queries (list test-select-query-1 test-select-query-2)
-                (list (list :id :author))))
+                (list {:join-with [:id :author], :strategy :left})))
 
 
 (defn attach-optional-filter-query
