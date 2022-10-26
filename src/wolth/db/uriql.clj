@@ -380,7 +380,7 @@
       (attach-optional-filter-query table-name filter-query)))
 
 (comment
-  (build-select "Person" "id==111" nil)
+  (build-select "Person" "id==111" nil (list :name :surname))
   (build-select "Person" "adsadsa" nil)
   (build-select "Person" "(name<>111)" [:= "hidden" false])
   (build-select "Person" "id==111" [:= "hidden" false])
@@ -432,6 +432,63 @@
   (build-delete "person" "aaaa" nil)
   (build-delete "person" "*" [:= "surname" "Kowalski"]))
 
+(def test-select-query-1
+  {:select (list :name :surname :id), :from :SourceTable, :where [:or [:> :age 20] [:= :name "Adam"]]})
+
+(def test-select-query-2
+  {:select :*, :from :SourceTable, :where [:<> :role "admin"]})
+
+(defn concat-as-keyword [kw as-clause] (->> kw (name) (str as-clause ".") (keyword)))
+
+(comment
+  (concat-as-keyword :id "testKW")
+  )
+
+(defn hydrate-from-clause [as-kw query])
+
+(defn hydrate-fields-clause [as-kw query])
+
+(defn hydrate-where-clause [as-kw query])
+
+(defn hydrate-set-clause [as-kw query])
+
+(comment
+  ()
+  )
+
+#_" We hydrate each query diffrently, UPDATE has also SET keyword, delete has no field list
+   "
+(defn hydrate-query-with-as-clause [query as-name]
+    (let [-hydrate-from-clause (partial hydrate-from-clause as-name)
+          -hydrate-fields-clause (partial hydrate-fields-clause as-name)
+          -hydrate-where-clause (partial hydrate-where-clause as-name)
+          -hydrate-set-clause (partial hydrate-set-clause as-name)]
+(case (first (keys query))
+      :select ((comp -hydrate-from-clause -hydrate-fields-clause -hydrate-where-clause) query)
+      :update ((comp -hydrate-from-clause -hydrate-fields-clause -hydrate-set-clause -hydrate-where-clause) query)
+      (throw (RuntimeException. "Tried to hydrate not supported query type"))
+      )
+      )
+    
+    )
+
+(comment
+  (hydrate-query-with-as-clause
+    {:select (list :name :surname), :from :Person, :where [:= :id "111"]}
+    "TEST")
+  (hydrate-query-with-as-clause
+    {:select :*, :from :Person, :where [:or [:> :age 20] [:= :name "Adam"]]}
+    "TEST"))
+
+(defn join-select-queries
+  [queries join-fields]
+  (assert (= (count queries) (dec (count join-fields)))))
+
+(comment
+  (join-select-queries
+    (list {:select (list :name :surname), :from :Person, :where [:= :id "111"]}
+          {:select (list :content :created-at), :from :Post})
+    (list :author)))
 
 ;; (defn build-query-from-url
 ;;   [url-string]
