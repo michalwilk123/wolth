@@ -3,7 +3,8 @@
             clojure.walk
             [honey.sql.helpers :as h]
             [wolth.server.exceptions :refer [throw-wolth-exception]]
-            [wolth.utils.common :refer [get-first-matching-pred]]))
+            [wolth.utils.common :refer [get-first-matching-pred zip]]
+            [wolth.db.fields :as fields]))
 
 
 (def open-bracket "(")
@@ -308,6 +309,98 @@
   (multiple-token-found "1111ddd" #"[0-9]+" #"[a-z]+")
   (multiple-token-found "13232132189321" #"[0-9]+" #"[a-z]+"))
 
+(def test-select-query-1
+  {:select (list :value1 :value2 :value3),
+   :from :FirstTable,
+   :where [:and
+           [:or [:and [:> :ll "100"] [:> :qq "30"] [:<> :mm "1"] [:<> :oo "10"]]
+            [:>= :cc "10"]] [:= :aa "bb"]]})
+
+(def test-select-query-2
+  {:select :*, :from :SecondTable, :where [:<> :role "admin"]})
+
+(defn concat-as-keyword
+  [as-clause kw]
+  (->> kw
+       (name)
+       (str as-clause ".")
+       (keyword)))
+
+(comment
+  (concat-as-keyword "testKW" :id))
+
+(defn hydrate-from-clause
+  [as-kw query]
+  (assoc query :from (vector (query :from) (keyword as-kw))))
+
+(defn hydrate-fields-clause
+  [as-kw query]
+  (let [[kw-to-change fields] (first query)]
+    (assoc query
+      kw-to-change (if (keyword? fields)
+                     (concat-as-keyword as-kw fields)
+                     (map (partial concat-as-keyword as-kw) fields)))))
+
+(defn hydrate-where-clause
+  [as-kw query]
+  (letfn [(build-where-cl [item]
+            (cond (vector? item) (vec (cons (first item)
+                                            (map build-where-cl (rest item))))
+                  (keyword? item) (concat-as-keyword as-kw item)
+                  :else item))]
+    (update-in query [:where] build-where-cl)))
+
+
+(defn hydrate-set-clause [as-kw query])
+
+(comment
+  (hydrate-from-clause "AS_TEST" test-select-query-1)
+  (hydrate-fields-clause "AS_TEST" test-select-query-1)
+  (hydrate-where-clause "AS_TEST" test-select-query-1)
+  (hydrate-where-clause "AS_TEST" test-select-query-2))
+
+#_" We hydrate each query with AS TABLE clause.
+   We change the strategy of the hydration depanding on the query type.
+   UPDATE has SET clause, DELETE has no field list, all queries have WHERE clause etc..
+   "
+(defn hydrate-query-with-as-clause
+  [query as-name]
+  (let [-hydrate-from-clause (partial hydrate-from-clause as-name)
+        -hydrate-fields-clause (partial hydrate-fields-clause as-name)
+        -hydrate-where-clause (partial hydrate-where-clause as-name)
+        -hydrate-set-clause (partial hydrate-set-clause as-name)]
+    (case (first (keys query))
+      :select ((comp -hydrate-from-clause
+                     -hydrate-fields-clause
+                     -hydrate-where-clause)
+                query)
+      :update ((comp -hydrate-from-clause
+                     -hydrate-fields-clause
+                     -hydrate-set-clause
+                     -hydrate-where-clause)
+                query)
+      (throw (RuntimeException. "Tried to hydrate unsupported query type")))))
+
+(comment
+  (hydrate-query-with-as-clause test-select-query-1 "TEST")
+  (hydrate-query-with-as-clause test-select-query-2 "TEST"))
+
+;; (defn- join-hydrated-queries [queries join-fields]
+;;   )
+
+(defn join-queries
+  [queries join-fields]
+  (assert (= (count queries) (inc (count join-fields))))
+  (let [as-kws (take (count queries) (map #(str "T" %) (iterate inc 1)))
+        hydrated-queries (map (partial apply hydrate-query-with-as-clause)
+                           (zip queries as-kws))]
+    hydrated-queries))
+
+(comment
+  (join-queries (list test-select-query-1 test-select-query-2)
+                (list (list :id :author))))
+
+
 (defn attach-optional-filter-query
   [subquery table-name filter-query]
   (if filter-query
@@ -431,64 +524,6 @@
   (build-delete "person" "*" nil)
   (build-delete "person" "aaaa" nil)
   (build-delete "person" "*" [:= "surname" "Kowalski"]))
-
-(def test-select-query-1
-  {:select (list :name :surname :id), :from :SourceTable, :where [:or [:> :age 20] [:= :name "Adam"]]})
-
-(def test-select-query-2
-  {:select :*, :from :SourceTable, :where [:<> :role "admin"]})
-
-(defn concat-as-keyword [kw as-clause] (->> kw (name) (str as-clause ".") (keyword)))
-
-(comment
-  (concat-as-keyword :id "testKW")
-  )
-
-(defn hydrate-from-clause [as-kw query])
-
-(defn hydrate-fields-clause [as-kw query])
-
-(defn hydrate-where-clause [as-kw query])
-
-(defn hydrate-set-clause [as-kw query])
-
-(comment
-  ()
-  )
-
-#_" We hydrate each query diffrently, UPDATE has also SET keyword, delete has no field list
-   "
-(defn hydrate-query-with-as-clause [query as-name]
-    (let [-hydrate-from-clause (partial hydrate-from-clause as-name)
-          -hydrate-fields-clause (partial hydrate-fields-clause as-name)
-          -hydrate-where-clause (partial hydrate-where-clause as-name)
-          -hydrate-set-clause (partial hydrate-set-clause as-name)]
-(case (first (keys query))
-      :select ((comp -hydrate-from-clause -hydrate-fields-clause -hydrate-where-clause) query)
-      :update ((comp -hydrate-from-clause -hydrate-fields-clause -hydrate-set-clause -hydrate-where-clause) query)
-      (throw (RuntimeException. "Tried to hydrate not supported query type"))
-      )
-      )
-    
-    )
-
-(comment
-  (hydrate-query-with-as-clause
-    {:select (list :name :surname), :from :Person, :where [:= :id "111"]}
-    "TEST")
-  (hydrate-query-with-as-clause
-    {:select :*, :from :Person, :where [:or [:> :age 20] [:= :name "Adam"]]}
-    "TEST"))
-
-(defn join-select-queries
-  [queries join-fields]
-  (assert (= (count queries) (dec (count join-fields)))))
-
-(comment
-  (join-select-queries
-    (list {:select (list :name :surname), :from :Person, :where [:= :id "111"]}
-          {:select (list :content :created-at), :from :Post})
-    (list :author)))
 
 ;; (defn build-query-from-url
 ;;   [url-string]
