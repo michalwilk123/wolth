@@ -56,12 +56,9 @@
                            :references "Person",
                            :rel-type :o2m,
                            :constraints [:not-null],
-                           
                            :ref "username"})
-  (expand-single-relation {:name "author",
-                           :references "Person",
-                           :rel-type :o2o,
-                           }))
+  (expand-single-relation
+    {:name "author", :references "Person", :rel-type :o2o}))
 
 (defn generate-fk-fields
   [relations]
@@ -70,14 +67,8 @@
   (map expand-single-relation relations))
 
 (comment
-  (generate-fk-fields [{:name "author",
-                        :rel-type :o2m,
-                        :references "Person",
-                        }
-                       {:name "owner",
-                        :rel-type :o2o,
-                        :references "Person",
-                        }])
+  (generate-fk-fields [{:name "author", :rel-type :o2m, :references "Person"}
+                       {:name "owner", :rel-type :o2o, :references "Person"}])
   (generate-fk-fields nil))
 
 
@@ -127,18 +118,13 @@
 (def _test-object-data-2
   {:fields [{:name "content", :type :text}],
    :name "Post",
-   :relations [{:name "author",
-                :rel-type :o2m,
-                :references "Person",
-                }]})
+   :relations [{:name "author", :rel-type :o2m, :references "Person"}]})
 
 (def _test-object-data-3
   {:name "Worker",
    :fields [{:name "first-name", :type :str128} {:name "email", :type :str128}],
    :options [:uuid-identifier],
-   :relations [{:name "supervisor",
-                :rel-type :o2m,
-                :references "Worker"}]})
+   :relations [{:name "supervisor", :rel-type :o2m, :references "Worker"}]})
 
 (def _test-objects (list (generate-create-table-query _test-object-data-2)))
 
@@ -161,17 +147,12 @@
 (comment
   (cross-field-w-related-table
     {:fields [{:name "note", :type :str32}], :name "Person"}
-    {:name "author",
-     :rel-type :o2m,
-     :references "Person",
-     })
-  (cross-field-w-related-table {:fields [{:name "note", :type :str32}],
-                                :name "Person",
-                                :options [:uuid-identifier]}
-                               {:name "author",
-                                :rel-type :o2m,
-                                :references "Person",
-                                }))
+    {:name "author", :rel-type :o2m, :references "Person"})
+  (cross-field-w-related-table
+    {:fields [{:name "note", :type :str32}],
+     :name "Person",
+     :options [:uuid-identifier]}
+    {:name "author", :rel-type :o2m, :references "Person"}))
 
 (defn cross-two-tables
   [tab tab-to-fetch-info]
