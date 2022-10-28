@@ -1,3 +1,4 @@
 {:lint-as {wolth.db.uriql/def-token clojure.core/def,
+           wolth.db.urisql-parser/def-named-token clojure.core/def,
            wolth.server.config/def-context clojure.core/def,
            wolth.server.exceptions/def-interceptor-fn clojure.core/defn}}
