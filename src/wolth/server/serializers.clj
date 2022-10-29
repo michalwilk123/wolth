@@ -2,6 +2,7 @@
   (:require
     [wolth.utils.common :as utils]
     [wolth.server.exceptions :refer [throw-wolth-exception def-interceptor-fn]]
+    [wolth.db.urisql-parser :refer [apply-uriql-syntax-sugar]]
     [honey.sql :as sql]
     [ring.util.codec :refer [url-decode]]
     [wolth.server.utils :as server-utils]
@@ -11,7 +12,7 @@
       _test-normalized-fields _test-json-body _test-bank-request-map]]
     [wolth.server.bank :as bank-utils]
     [wolth.db.uriql :refer
-     [build-select merge-select-hsql merge-update-hsql build-update
+     [build-select merge-select-hsql merge-hsql-queries build-single-hsql-map
       build-delete]]
     [wolth.server.config :refer [def-context app-data-container]]
     [wolth.db.fields :as fields]))
@@ -121,7 +122,8 @@
                                  object-specs
                                  :insert-id
                                  true)]
-      (fields->insert-sql table-name normalized-fields)
+      (-> (build-single-hsql-map :insert table-name nil normalized-fields)
+          (sql/format))
       (throw-wolth-exception :400))))
 
 (comment
@@ -133,19 +135,22 @@
 (defn- serialize-get
   [path-params serializer-specs objects-data]
   (let [serializer-fields (map #(map keyword (% :fields)) serializer-specs)
-        filter-subqueries (map :filter serializer-specs)
+        additional-subqueries (map :additional-query serializer-specs)
         object-names (map #(get % :name) objects-data)
-        queries (map url-decode (vals path-params))]
-    (println serializer-fields)
-    (as-> (map build-select object-names queries filter-subqueries serializer-fields)
-      it
-      (merge-select-hsql it)
-      (sql/format it))))
+        queries (map str
+                  (map server-utils/sanitize-uriql-query (vals path-params))
+                  additional-subqueries)]
+    (->> (map (partial build-single-hsql-map :select)
+           object-names
+           queries
+           serializer-fields)
+         (merge-hsql-queries :select objects-data)
+         (sql/format))))
 
 (comment
-  (serialize-get {:personQuery "<<username"}
+  (serialize-get {:personQuery "sorta(\"name\")"}
                  (list {:fields ["username" "email"],
-                        :filter [:= "role" "regular"]})
+                        :additional-query "filter(\"role\"=='regular')"})
                  _test-object-spec))
 
 
@@ -154,53 +159,58 @@
   (assert (seq? serializer-specs))
   (assert (map? body-params))
   (assert (seq? object-specs))
-  (let [object-names (map #(get % :name) object-specs)
+  (let [object-names (first (map #(get % :name) object-specs))
         fields (:fields (first serializer-specs))
         attatched (:attatched (first serializer-specs))
-        filter-subqueries (map :filter serializer-specs)
+        additional-subqueries (map :additional-query serializer-specs)
         processed-fields (as-> body-params it
                            (select-keys it (map keyword fields))
                            (utils/assoc-vector it attatched))
-        queries (map url-decode (vals path-params))]
+        query (first
+                (map str
+                  (map server-utils/sanitize-uriql-query (vals path-params))
+                  additional-subqueries))]
     (if-let [normalized-fields (normalize-field-associeted-w-object
                                  processed-fields
                                  object-specs)]
-      (as-> (utils/zip object-names queries filter-subqueries) it
-        (map (partial apply build-update) it)
-        (merge-update-hsql it normalized-fields)
-        (sql/format it))
+      (-> (build-single-hsql-map :update object-names query normalized-fields)
+          (sql/format))
       (throw-wolth-exception :400))))
 
+
 (comment
-  (serialize-patch {:personQuery "username==michal"}
+  (serialize-patch {:personQuery "\"username\"=='michal'"}
                    {:email "nowyMail@aa.bb"}
                    (list {:fields ["username" "email"],
-                          :filter [:= "role" "regular"]})
+                          :additional-query "filter(\"role\"=='regular')"})
                    _test-object-spec)
-  (serialize-patch {:personQuery "<<username"}
+  (serialize-patch {:personQuery "*"}
                    {:email "nowyMail@aa.bb"}
                    (list {:fields ["username" "email"],
-                          :filter [:= "role" "regular"]})
+                          :additional-query "filter(\"role\"=='regular')"})
                    _test-object-spec))
 
 (defn- serialize-delete
   [path-params serializer-specs objects-data]
   (let [table-name (:name (first objects-data))
-        selector (url-decode (first (vals path-params)))
-        filter-subquery (:filter (first serializer-specs))]
-    (as-> (list table-name selector filter-subquery) it
-      (apply build-delete it)
-      (sql/format it))))
+        additional-subqueries (map :additional-query serializer-specs)
+        query (first
+                (map str
+                  (map server-utils/sanitize-uriql-query (vals path-params))
+                  additional-subqueries))]
+    (-> (build-single-hsql-map :delete table-name query nil)
+        (sql/format))))
 
 (comment
-  (serialize-delete {:personQuery "username==michal"}
-                    (list {:filter [:= "role" "regular"]})
+  (serialize-delete {:personQuery "\"username\"=='michal'"}
+                    (list {:additional-query "filter(\"role\"=='regular')"})
                     _test-object-spec)
-  (serialize-delete {:personQuery "<<username"} ; should throw exception
-                    (list {:filter [:= "role" "regular"]})
+  (serialize-delete {:personQuery "sorta(\"name\")"} ; should throw exception
+                    (list {:additional-query "filter(\"role\"=='regular')"})
                     _test-object-spec)
   (serialize-delete {:personQuery "*"}
-                    (list {:filter [:< "createdAt" "10-10-2020"]})
+                    (list {:additional-query
+                             "filter(\"createdAt\"<'10-10-2020')"})
                     _test-object-spec))
 
 (def-interceptor-fn
