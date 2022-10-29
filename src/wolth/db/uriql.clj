@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             clojure.walk
             [honey.sql.helpers :as h]
+            [wolth.db.urisql-parser :refer [parse-uriql]]
             [wolth.server.exceptions :refer [throw-wolth-exception]]
             [wolth.utils.common :refer
              [get-first-matching-pred concat-vec-field-in-maps concatv]]
@@ -10,13 +11,6 @@
 
 (def open-bracket "(")
 (def close-bracket ")")
-
-; Available operations:
-; - sort "<<" ">>"
-; - filter - znaki: "==" "<>" ">" ">=" "LEN".
-;    Połączone za pomocą
-; - * (all)
-; - detail - zwykły znak "="
 
 (defmacro def-token
   [name & exprs]
@@ -54,6 +48,12 @@
   (token-found? filterOperatorToken "<" :exact)
   (str/replace "<<name>>age(dsadsa==1$or$ccc<=21)" sortToken ""))
 
+;; New uriql proposal:
+;; filter("asdsadsa"='cccc')
+;; filter("asdsadsa"=='cccc'and"abc">'200')
+;; sortby(desc("aaaa")asc("mmmm"))
+;; limit(10)
+;; offset(100)
 
 #_"THIS TOKEN IS FOR INTERNAL PARSER PURPOSES! DO NOT USE IT!"
 (def filterQueryCandidateRe
@@ -75,6 +75,7 @@
   (token-found? fullFilterQueryExpr "name==Adam$and$age>10" :exact)
   (token-found? fullFilterQueryExpr "(name==Adam$and$surname<>kowalski)" :exact)
   (token-found? fullFilterQueryExpr "name==Adam" :exact)
+  (token-found? fullFilterQueryExpr "lalala" :exact)
   (token-found? fullFilterQueryExpr "<<name" :exact)
   (token-found? fullFilterQueryExpr "id==58 123-121-233" :exact)
   (str/replace "name==Adam$and$age>10" fullFilterQueryExpr "QQQ")
@@ -91,6 +92,9 @@
 
 (comment
   (parse-tokens-from-text "username=Michal" detailToken :fieldToken :valueToken)
+  (parse-tokens-from-text "dadsada111,qqqqq222,ooo444" fieldToken :fieldToken)
+  (re-seq #"([a-zA-Z][a-zA-Z0-9]*)|(\"[a-zA-Z][a-zA-Z0-9]*\")"
+          "dadsada111,\"qqqq\"aaa\"q222\",ooo444")
   (parse-tokens-from-text "<<name" sortToken :fieldToken :sortDirToken))
 
 
@@ -236,47 +240,42 @@
   (hydrate-filter-query-w-table-name [:or [:> :age 20] [:= :name "Adam"]]
                                      "Person"))
 
-; zawijający parser
 (defn parse-filter-expr
-  [expr table-name]
+  [expr]
   (-> expr
       (split-filter-query-into-chunks)
-      (filter-parser)
-      (hydrate-filter-query-w-table-name table-name)))
+      (filter-parser)))
 
 (comment
-  (parse-filter-expr "name==Adam" "Person")
-  (parse-filter-expr "(name==Adam$and$(sul==smazona$or$cukier==chlodzony))"
-                     "Person")
+  (parse-filter-expr "name==Adam")
+  (parse-filter-expr "(name==Adam$and$(sul==smazona$or$cukier==chlodzony))")
   (parse-filter-expr
-    "(aa==bb$and$cc>=10$or$oo<>10$and$(mm<>1$and$qq>30$and$(ll=1$and$ll>100)))"
-    "TableName")
-  (parse-filter-expr "aa==bb$or$cc>=10$or$oo<>10$or$qq>=888" "TableName")
-  (parse-filter-expr "(date<1$and$name<>nazwa)$or$age>=1" "Movie"))
+    "(aa==bb$and$cc>=10$or$oo<>10$and$(mm<>1$and$qq>30$and$(ll=1$and$ll>100)))")
+  (parse-filter-expr "aa==bb$or$cc>=10$or$oo<>10$or$qq>=888")
+  (parse-filter-expr "(date<1$and$name<>nazwa)$or$age>=1"))
 
-(defn filter-builder
-  [table-name expr]
-  {:where (parse-filter-expr expr table-name)})
+(defn filter-builder [expr] {:where (parse-filter-expr expr)})
 
 (comment
-  (filter-builder "Movie" "(date<1$and$name<>nazwa)$or$age>=1"))
+  (filter-builder "(date<1$and$name<>nazwa)$or$age>=1"))
 
-(defn create-sql-selector
-  [table-name field]
-  (keyword (str table-name "." field)))
+;; (defn create-sql-selector
+;;   [table-name field]
+;;   (keyword (str table-name "." field)))
 
-(defn detail-builder
-  [table-name selector]
-  (let [parsed-vals
-          (parse-tokens-from-text selector detailToken :fieldToken :valueToken)]
-    {:where [:= (create-sql-selector table-name (parsed-vals :fieldToken))
-             (parsed-vals :valueToken)]}))
+;; (defn detail-builder
+;;   [selector]
+;;   (let [parsed-vals
+;;           (parse-tokens-from-text selector detailToken :fieldToken
+;;           :valueToken)]
+;;     {:where [:= (parsed-vals :fieldToken)
+;;              (parsed-vals :valueToken)]}))
 
-(comment
-  (detail-builder "aaaa" "id=123"))
+;; (comment
+;;   (detail-builder "id=123"))
 
 (defn sort-builder
-  [table-name selector]
+  [selector]
   (letfn [(single-sort-builder [single-selector]
             (let [parsed-vals (parse-tokens-from-text (first single-selector)
                                                       sortToken
@@ -288,11 +287,15 @@
                         "<<" :desc))))]
     (->> (re-seq sortToken selector)
          (map single-sort-builder)
-         (map (fn [x] (assoc x 0 (keyword (str table-name "." (first x))))))
+         (map (fn [x]
+                (assoc x
+                  0 (-> x
+                        first
+                        keyword))))
          (apply h/order-by))))
 
 (comment
-  (sort-builder "person" "<<name>>age"))
+  (sort-builder "<<name>>age"))
 
 (defn multiple-token-found
   [query & tokens]
@@ -362,7 +365,17 @@
                (fn [sort-q]
                  (update-in sort-q [0] (partial concat-as-keyword as-kw))))))
 
-(defn hydrate-set-clause [as-kw query])
+#_"NOT READY YET"
+(defn hydrate-set-clause
+  [as-kw query]
+  (update
+    query
+    :set
+    (fn [it]
+      (and (map? it)
+           (->> it
+                (map (fn [[k val]] (vector (concat-as-keyword as-kw k) val)))
+                (into {}))))))
 
 (comment
   (hydrate-from-clause "AS_TEST" test-select-query-1)
@@ -381,19 +394,22 @@
         -hydrate-fields-clause (partial hydrate-fields-clause as-name)
         -hydrate-where-clause (partial hydrate-where-clause as-name)
         -hydrate-set-clause (partial hydrate-set-clause as-name)
-        -hydrate-sort-clause (partial hydrate-sort-clause as-name)]
-    (case (first (keys query))
-      :select ((comp -hydrate-from-clause
-                     -hydrate-fields-clause
-                     -hydrate-where-clause
-                     -hydrate-sort-clause)
-                query)
-      :update ((comp -hydrate-from-clause
-                     -hydrate-fields-clause
-                     -hydrate-set-clause
-                     -hydrate-where-clause)
-                query)
-      (throw (RuntimeException. "Tried to hydrate unsupported query type")))))
+        -hydrate-sort-clause (partial hydrate-sort-clause as-name)
+        field-exists? (partial get query)]
+    (cond
+      (field-exists? :select) ((comp -hydrate-from-clause
+                                     -hydrate-fields-clause
+                                     -hydrate-where-clause
+                                     -hydrate-sort-clause)
+                                query)
+      (field-exists? :update) ((comp -hydrate-from-clause
+                                     -hydrate-fields-clause
+                                     -hydrate-set-clause
+                                     -hydrate-where-clause)
+                                query)
+      :else (throw (RuntimeException.
+                     "Tried to hydrate unsupported query type")))))
+
 
 (comment
   (hydrate-query-with-as-clause test-select-query-1 "TEST")
@@ -472,40 +488,48 @@
   (join-queries (list test-select-query-1 test-select-query-2)
                 (list {:join-with [:id :author], :strategy :left})))
 
+(defn- translate-string-fields-into-keywords
+  [sub-query]
+  (cond (and (vector? sub-query) (.contains [:and :or] (first sub-query)))
+          (mapv translate-string-fields-into-keywords sub-query)
+        (vector? sub-query) (update-in sub-query [1] keyword)
+        (keyword? sub-query) sub-query
+        :else (throw (RuntimeException.
+                       "Syntax error in filter query for serializers"))))
+
+(comment
+  (translate-string-fields-into-keywords [:= "owner" "Michał"])
+  (translate-string-fields-into-keywords
+    [:and [:or [:> "age" 100] [:= "owner" "Michał"]] [:= "name" "John"]]))
+
+(defn- merge-where-clauses
+  [-filter-query current]
+  (let [filter-query (translate-string-fields-into-keywords -filter-query)]
+    (cond (= (first current) :and) (conj (conj current filter-query))
+          (vector? current) (vector :and current filter-query)
+          :else filter-query)))
 
 (defn attach-optional-filter-query
-  [subquery table-name filter-query]
+  [subquery filter-query]
   (if filter-query
-    (update-in subquery
-               [:where]
-               (fn [current]
-                 (let [hydrated-query (hydrate-filter-query-w-table-name
-                                        filter-query
-                                        table-name
-                                        :allow-string-fields
-                                        true)]
-                   (cond (= (first current) :and) (conj current hydrated-query)
-                         (vector? current) (vector :and current hydrated-query)
-                         :else hydrated-query))))
+    (update-in subquery [:where] (partial merge-where-clauses filter-query))
     subquery))
 
 (comment
-  (attach-optional-filter-query {:where [:or [:= :Person.role "regular"]
-                                         [:<> :Person.surname "Kowalski"]]}
-                                "Person"
+  (attach-optional-filter-query {:where [:or [:= :role "regular"]
+                                         [:<> :surname "Kowalski"]]}
                                 [:= "owner" "Michał"])
-  (attach-optional-filter-query {:where [:and [:= :Person.role "regular"]
-                                         [:<> :Person.surname "Kowalski"]]}
-                                "Person"
+  (attach-optional-filter-query {:where [:and [:= :role "regular"]
+                                         [:<> :surname "Kowalski"]]}
                                 [:= "owner" "Michał"])
-  (attach-optional-filter-query {} "Person" [:= "owner" "Michał"]))
+  (attach-optional-filter-query {} [:= "owner" "Michał"]))
 
 (defn build-selector-query
-  [table-name selector &
+  [selector &
    {:keys [sort-clause all-clause filter-clause],
     :or {all-clause true, filter-clause true, sort-clause true}}]
-  (assert (and (string? table-name) (string? selector))
-          "Both arguments must be a string!")
+  ;; (assert (and (string? table-name) (string? selector))
+  ;;         "Both arguments must be a string!")
   (letfn
     [(all-clause-parser []
        (and all-clause (token-found? allToken selector :exact) {}))
@@ -513,16 +537,15 @@
        (and sort-clause
             filter-clause
             (multiple-token-found selector sortToken filterQueryCandidateRe)
-            (merge (sort-builder table-name selector)
-                   (filter-builder table-name selector))))
+            (merge (sort-builder selector) (filter-builder selector))))
      (sort-parser []
        (and sort-clause
             (token-found? sortExprToken selector :exact)
-            (sort-builder table-name selector)))
+            (sort-builder selector)))
      (filter-parser []
        (and filter-clause
             (token-found? fullFilterQueryExpr selector :exact)
-            (filter-builder table-name selector)))
+            (filter-builder selector)))
      (syntax-error []
        (throw-wolth-exception :400
                               (format "Uriql syntax error. Unknown input: %s"
@@ -531,65 +554,101 @@
                               sort-parser filter-parser syntax-error])))
 
 (comment
-  (build-selector-query "Person" "name==michal")
-  (build-selector-query "Person" "(name==michal$and$surname<>kowalski)")
-  (build-selector-query "Person" "(name==Adam$and$surname<>kowalski)")
-  (build-selector-query "Person" "*")
-  (build-selector-query "Person" "<<name(name==michal$and$id<>123)")
-  (build-selector-query "Person" "<<name>>surname"))
+  (build-selector-query "name==michal")
+  (build-selector-query "(name==michal$and$surname<>kowalski)")
+  (build-selector-query "(name==Adam$and$surname<>kowalski)")
+  (build-selector-query "*")
+  (build-selector-query "lalalala")
+  (build-selector-query "<<name(name==michal$and$id<>123)")
+  (build-selector-query "<<name>>surname"))
 
 (defn build-select
-  [table-name selector filter-query & [fields]]
+  [table-name selector fields]
   (-> {:select (or fields :*), :from (keyword table-name)}
-      (merge (build-selector-query table-name selector))
-      (attach-optional-filter-query table-name filter-query)))
+      ;; (merge (build-selector-query selector))
+      (merge (parse-uriql selector #{"filter" "sorta" "sortd"}))
+      ;; (attach-optional-filter-query filter-query)
+  ))
 
 (comment
-  (build-select "Person" "id==111" nil (list :name :surname))
+  (build-select "Person" "filter(\"id\"=='111')" (list :name :surname))
+  (build-select "Person" "sorta(\"name\")" (list :name :surname))
   (build-select "Person" "adsadsa" nil)
-  (build-select "Person" "(name<>111)" [:= "hidden" false])
-  (build-select "Person" "id==111" [:= "hidden" false])
-  (build-select "Person" "<<name>>age" nil)
-  (build-select "Person" "<<name" nil)
-  (build-select "Person" "<<name" [:= "id" 997])
-  (build-select "Person" "*" nil)
-  (build-select "User" "*" nil (list :author :content :id))
-  (build-select "Person" "<<name(name<>admin)" nil)
-  (build-select "Person" "(name==Adam$and$age>10)" nil))
+  ;; (build-select "Person" "name<>111" [:= "hidden" false])
+  ;; (build-select "Person" "id==111" [:= "hidden" false])
+  ;; (build-select "Person" "<<name>>age" nil)
+  ;; (build-select "Person" "<<name" nil)
+  ;; (build-select "Person" "<<name" [:= "id" 997])
+  ;; (build-select "Person" "*" nil)
+  ;; (build-select "Person" "<<name(name<>admin)" nil)
+  ;; (build-select "Person" "(name==Adam$and$age>10)" nil)
+  ;; (build-select "User" "*" nil (list :author :content :id))
+)
 
 (defn build-update
-  [table-name selector filter-query]
+  [table-name selector]
   (-> {:update (keyword table-name)}
-      (merge (build-selector-query table-name selector :sort-clause false))
-      (attach-optional-filter-query table-name filter-query)))
+      ;; (merge (build-selector-query selector :sort-clause false))
+      (merge (parse-uriql selector #{"filter"}))
+      ;; (attach-optional-filter-query filter-query)
+  ))
 
 (comment
-  (build-update "person" "name==admin" nil)
-  (build-update "person" ; should throw syntax error because sorts are not
-                         ; permitted
-                "<<createdAt"
-                [:= "id" 112])
-  (build-update "person" "*" [:= "id" 112]))
+  (build-update "person" "filter(\"name\"=='admin')"))
 
+(defn build-single-hsql-map
+  [type table-name selector-str & [fields]]
+  (let [table-kw (keyword table-name)]
+    (case type
+      :select (-> {:select (or fields :*), :from table-kw}
+                  (merge (parse-uriql selector-str
+                                      #{"filter" "sorta" "sortd"})))
+      :insert {:insert-into table-kw, :values [fields]}
+      :update (-> {:update table-kw}
+                  (merge (parse-uriql selector-str #{"filter"}))
+                  (update :set (partial merge fields)))
+      :delete (-> {:delete-from table-kw}
+                  (merge (parse-uriql selector-str #{"filter"})))
+      (throw-wolth-exception :500 (str "Unknown query type: " type)))))
+
+(comment
+  (build-single-hsql-map :update "person" "filter(\"name\"=='admin')")
+  (build-single-hsql-map :select "person"
+                         "sorta(\"name\")filter(\"role\"=='regular')"
+                           '(:username :email)))
+
+;; to finish in some future. For now joins are implemented only on selects
+(defn merge-hsql-queries
+  [type tab-specs queries]
+  (if (= (count queries) 1)
+    (-> queries
+        (first))
+    (case type
+      :select ()
+      (throw-wolth-exception :500
+                             (str "Don't know how to merge queries with type: "
+                                  type)))))
 
 #_"Below functions will be crutial for implementing dynamic joins.
-   For now i left them not completed"
+   For now i left them not completed TODO: lalala"
 (defn merge-select-hsql [queries] (first queries))
 
 (defn merge-update-hsql
   [queries set-vals]
   (assoc (first queries) :set set-vals))
 
-(comment
-  (merge-update-hsql (list (build-update "person" "*" [:= "id" 112]))
-                     {:email "nowy@mail.com"}))
+;; (comment
+;;   (merge-update-hsql (list (build-update "person" "*" [:= "id" 112]))
+;;                      {:email "nowy@mail.com"}))
 
 
 (defn build-delete
   [table-name selector filter-query]
   (-> {:delete-from (keyword table-name)}
-      (merge (build-selector-query table-name selector :sort-clause false))
-      (attach-optional-filter-query table-name filter-query)))
+      (merge (parse-uriql selector #{"filter"}))
+      ;; (merge (build-selector-query selector :sort-clause false))
+      ;; (attach-optional-filter-query filter-query)
+  ))
 
 (comment
   (build-delete "person" "name<>michal" nil)
