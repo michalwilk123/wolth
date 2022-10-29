@@ -39,7 +39,7 @@
                  :update {:fields ["username" "password" "role" "email"]},
                  :read {:fields ["id" "username" "role" "email"]},
                  :model "User",
-                 :delete {:filter [:<> "id" :user-id]}}]})
+                 :delete {:additional-query "filter(\"id\"<><:user-id>)"}}]})
 
 (def user-regular-view
   {:allowed-roles true,
@@ -47,9 +47,9 @@
    :operations [{:create {:fields ["username" "password" "email"],
                           :attached [["role" "regular"]]},
                  :update {:fields ["username" "email" "password"],
-                          :filter [:= "id" :user-id]},
+                          :additional-query "filter(\"id\"<><:user-id>)"},
                  :model "User",
-                 :delete {:filter [:= "id" :user-id]}}]})
+                 :delete {:additional-query "filter(\"id\"<><:user-id>)"}}]})
 
 (defn fetch-user-data
   [username app-name]

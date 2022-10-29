@@ -13,8 +13,11 @@
            {:fields [{:name "content", :type :text}],
             :name "Post",
             :options [:uuid-identifier],
-            :relations
-              [{:name "author", :references "Person", :rel-type :o2m}]}],
+            :relations [{:name "author",
+                         :references "Person",
+                         :rel-type :o2m,
+                         :related-name-inside "author",
+                         :related-name-outside "posts"}]}],
  :persistent-db {:dbname "mydatabase", :dbtype "h2"},
  :serializers
    [{:allowed-roles ["admin"],
@@ -23,8 +26,8 @@
        [{:create {:attached [["note" "Testowa notatka"]], :fields ["name"]},
          :delete true,
          :model "Person",
-         :read {:fields ["name" "note" "id"],
-                :filter [:= "author" :user-id],
+         :read {:additional-query "filter(\"author\"==<:user-id>)",
+                :fields ["name" "note" "id"],
                 :join-with [{:model "Post", :relation-field "author"}]},
          :update {:fields ["name"]}}]}]}
 

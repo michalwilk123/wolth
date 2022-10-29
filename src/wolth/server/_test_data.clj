@@ -111,16 +111,16 @@
                 :method :get,
                 :arg-source :query,
                 :args [["num" :int]]}],
-   :serializers [{:name "public",
-                  :allowed-roles ["admin"],
-                  :operations [{:model "User",
-                                :read {:fields ["username" "email"],
-                                       :filter [:= "author" :user-id]},
-                                :update {:fields ["username" "email"]},
-                                :create {:fields ["username" "email"
-                                                  "password"],
-                                         :attached [["role" "regular"]]},
-                                :delete true}]}]})
+   :serializers
+     [{:name "public",
+       :allowed-roles ["admin"],
+       :operations [{:model "User",
+                     :read {:fields ["username" "email"],
+                            :additional-query "filter(\"author\"==<:user-id>)"},
+                     :update {:fields ["username" "email"]},
+                     :create {:fields ["username" "email" "password"],
+                              :attached [["role" "regular"]]},
+                     :delete true}]}]})
 
 ; =============== TEST DATA FOR serializers.clj ================ END
 
