@@ -1,7 +1,9 @@
 (ns wolth.server.utils
   (:require [clojure.string :as str]
-            [wolth.server.config :refer [app-data-container]]
+            [ring.util.codec :refer [url-decode]]
+            [wolth.db.urisql-parser :refer [apply-uriql-syntax-sugar]]
             [wolth.server.-test-data :refer [_server_test_app_data]]
+            [wolth.server.config :refer [app-data-container]]
             [wolth.server.exceptions :refer
              [def-interceptor-fn throw-wolth-exception]]
             [wolth.utils.common :as common]))
@@ -100,3 +102,10 @@
     (get-associated-objects (_server_test_app_data :objects) (list "User"))
     (get-in _server_test_app_data [:serializers 0 :operations])
     :delete))
+
+
+(defn sanitize-uriql-query
+  [query]
+  (-> query
+      (url-decode)
+      (apply-uriql-syntax-sugar)))

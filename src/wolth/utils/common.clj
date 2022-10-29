@@ -174,3 +174,21 @@
   (concat-vec-field-in-maps
     (list {:uu [1122 33], :abc :lalala} {:abc [1 2 3 4 5], :pp 123} {:mm 33})
     :abc))
+
+
+(defn seqs-equal?
+  [& seqs]
+  (and (apply = (map count seqs)) (every? true? (apply (partial map =) seqs))))
+
+(comment
+  (seqs-equal? (range 8) (range 10))
+  (seqs-equal? (range 10) (range 10))
+  (seqs-equal? (repeat 10 1) (range 10)))
+
+(defn trim-string
+  [text & {:keys [start], :or {start 1}}]
+  (subs text start (dec (.length text))))
+
+(comment
+  (trim-string "-dsads-")
+  (trim-string "-12345678-" :start 2))
