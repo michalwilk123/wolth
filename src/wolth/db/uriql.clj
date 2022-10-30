@@ -131,12 +131,35 @@
                        (list "T1" "T2" "T3")
                        (list :User :Assignment :Class)))
 
+
+(defn- merge-where-clauses
+  [filter-query current]
+  (cond (nil? filter-query) current
+        (nil? current) filter-query
+        (= (first current) :and) (conj (conj current filter-query))
+        (vector? current) (vector :and current filter-query)
+        :else filter-query))
+
+(comment
+  (merge-where-clauses nil [:> :age 11])
+  (merge-where-clauses [:= :id "dsdsa"] [:> :age 11])
+  (merge-where-clauses [:and [:= :id "dsdsa"] [:> :age 11]] [:> :age 11]))
+
 (defn- merge-select-simple
   [queries]
+  (println queries)
   (->> {:select (concat-vec-field-in-maps queries :select),
         :from (first (map :from queries)),
-        :order-by (concat-vec-field-in-maps queries :order-by)}
+        :order-by (concat-vec-field-in-maps queries :order-by),
+        :where (vec (cons :and (map :where queries)))}
        (remove-nil-vals-from-map)))
+
+(comment
+  (merge-select-simple (list {:select :T1.*,
+                              :from [:FirstTable :T1],
+                              :order-by [[:T2.name :desc]],
+                              :where [:> :T1.ll 100]}
+                             {:select :T2.*, :from [:SecTable :T2]})))
 
 (defn- join-map-to-clause
   [join-data]
@@ -164,32 +187,27 @@
         hydrated-fields (hydrate-join-fields join-fields as-kws table-names)]
     (->> hydrated-queries
          (merge-select-simple)
-         (hydrate-queries-with-joins hydrated-fields))))
+         ;;  (hydrate-queries-with-joins hydrated-fields)
+    )))
 
 (comment
   (join-queries (list test-select-query-1 test-select-query-2)
                 (list {:joint [:id :author]})))
 
-(defn- translate-string-fields-into-keywords
-  [sub-query]
-  (cond (and (vector? sub-query) (.contains [:and :or] (first sub-query)))
-          (mapv translate-string-fields-into-keywords sub-query)
-        (vector? sub-query) (update-in sub-query [1] keyword)
-        (keyword? sub-query) sub-query
-        :else (throw (RuntimeException.
-                       "Syntax error in filter query for serializers"))))
+;; (defn- translate-string-fields-into-keywords
+;;   [sub-query]
+;;   (cond (and (vector? sub-query) (.contains [:and :or] (first sub-query)))
+;;           (mapv translate-string-fields-into-keywords sub-query)
+;;         (vector? sub-query) (update-in sub-query [1] keyword)
+;;         (keyword? sub-query) sub-query
+;;         :else (throw (RuntimeException.
+;;                        "Syntax error in filter query for serializers"))))
 
-(comment
-  (translate-string-fields-into-keywords [:= "owner" "Michał"])
-  (translate-string-fields-into-keywords
-    [:and [:or [:> "age" 100] [:= "owner" "Michał"]] [:= "name" "John"]]))
+;; (comment
+;;   (translate-string-fields-into-keywords [:= "owner" "Michał"])
+;;   (translate-string-fields-into-keywords
+;;     [:and [:or [:> "age" 100] [:= "owner" "Michał"]] [:= "name" "John"]]))
 
-(defn- merge-where-clauses
-  [-filter-query current]
-  (let [filter-query (translate-string-fields-into-keywords -filter-query)]
-    (cond (= (first current) :and) (conj (conj current filter-query))
-          (vector? current) (vector :and current filter-query)
-          :else filter-query)))
 
 (defn attach-optional-filter-query
   [subquery filter-query]

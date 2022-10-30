@@ -149,7 +149,8 @@
            queries
            serializer-fields)
          (merge-hsql-queries :select relations-data)
-         (sql/format))))
+         ;;  (sql/format)
+    )))
 
 (comment
   (serialize-get {:User-query "filter(\"name\"=='John')"}
