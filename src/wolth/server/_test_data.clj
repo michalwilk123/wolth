@@ -50,6 +50,23 @@
         {:constraints [:unique], :name "email", :type :str128}],
      :options [:uuid-identifier]}))
 
+(def _test-object-spec-with-relations-1
+  {:name "Country",
+   :fields [{:constraints [:not-null], :name "countryName", :type :str128}
+            {:constraints [:unique], :name "code", :type :int}
+            {:constraints [:unique], :name "president", :type :str128}]})
+
+(def _test-object-spec-with-relations-2
+  {:name "City",
+   :fields [{:constraints [:not-null], :name "cityName", :type :str128}
+            {:constraints [], :name "creationData", :type :str128}
+            {:constraints [], :name "major", :type :str128}],
+   :relations [{:name "country_id",
+                :references "Country",
+                :rel-type :o2m,
+                :related-name-inside "country",
+                :related-name-outside "cities"}]})
+
 (def _test-normalized-fields
   {:id "65ebc5a7-348c-4bb7-a58b-54d96a1b41bf",
    :username "Mariusz",
@@ -72,21 +89,21 @@
   {:logged-user {:username "Przemek", :id 22222},
    :request {:json-params {},
              :uri "/test-app/User/*/public",
-             :path-params {:User_query "*"},
+             :path-params {:User-query "*"},
              :request-method :get}})
 
 (def _test-patch-request-map
   {:logged-user {:username "Przemek", :id 22222},
    :request {:json-params {:username "Marek"},
              :uri "/test-app/User/username==Przemek/public",
-             :path-params {:User_query "username==Przemek"},
+             :path-params {:User-query "username==Przemek"},
              :request-method :patch}})
 
 (def _test-delete-request-map
   {:logged-user {:username "Przemek", :id 22222},
    :request {:json-params {},
              :uri "/test-app/User/*/public",
-             :path-params {:User_query "username==Przemek"},
+             :path-params {:User-query "username==Przemek"},
              :request-method :delete}})
 
 (def _test-bank-request-map

@@ -1,12 +1,9 @@
 (ns wolth.db.uriql
-  (:require 
-            clojure.walk
-            
+  (:require clojure.walk
             [wolth.db.urisql-parser :refer [parse-uriql]]
             [wolth.server.exceptions :refer [throw-wolth-exception]]
             [wolth.utils.common :refer
-             [ concat-vec-field-in-maps concatv remove-nil-vals-from-map]]
-   ))
+             [concat-vec-field-in-maps concatv remove-nil-vals-from-map]]))
 
 
 (def test-select-query-1
@@ -56,11 +53,12 @@
 (defn hydrate-sort-clause
   [as-kw query]
   (update query
-             :order-by
-             #(and %
-               ( mapv
-               (fn [sort-q]
-                 (update-in sort-q [0] (partial concat-as-keyword as-kw))) %))))
+          :order-by
+          #(and
+             %
+             (mapv (fn [sort-q]
+                     (update-in sort-q [0] (partial concat-as-keyword as-kw)))
+               %))))
 
 #_"NOT READY YET"
 (defn hydrate-set-clause
@@ -80,8 +78,7 @@
   (hydrate-where-clause "AS_TEST" test-select-query-1)
   (hydrate-where-clause "AS_TEST" test-select-query-2)
   (hydrate-sort-clause "AS_TEST" test-select-query-2)
-  (hydrate-sort-clause "AS_TEST" test-select-query-1)
-  )
+  (hydrate-sort-clause "AS_TEST" test-select-query-1))
 
 #_" We hydrate each query with AS TABLE clause.
    We change the strategy of the hydration depanding on the query type.
@@ -137,10 +134,9 @@
 (defn- merge-select-simple
   [queries]
   (->> {:select (concat-vec-field-in-maps queries :select),
-   :from (first (map :from queries)),
-   :order-by (concat-vec-field-in-maps queries :order-by)} 
-      (remove-nil-vals-from-map)
-       ))
+        :from (first (map :from queries)),
+        :order-by (concat-vec-field-in-maps queries :order-by)}
+       (remove-nil-vals-from-map)))
 
 (defn- join-map-to-clause
   [join-data]

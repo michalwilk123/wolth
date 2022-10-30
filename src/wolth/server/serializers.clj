@@ -12,9 +12,7 @@
       _test-object-spec-with-relations-1 _test-object-spec-with-relations-2
       _test-normalized-fields _test-json-body _test-bank-request-map]]
     [wolth.server.bank :as bank-utils]
-    [wolth.db.uriql :refer
-     [ merge-hsql-queries build-single-hsql-map
-      ]]
+    [wolth.db.uriql :refer [merge-hsql-queries build-single-hsql-map]]
     [wolth.server.config :refer [def-context app-data-container]]
     [wolth.db.fields :as fields]))
 
@@ -151,8 +149,7 @@
            queries
            serializer-fields)
          (merge-hsql-queries :select relations-data)
-          (sql/format)
-    )))
+         (sql/format))))
 
 (comment
   (serialize-get {:User-query "filter(\"name\"=='John')"}

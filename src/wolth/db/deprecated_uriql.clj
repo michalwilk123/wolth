@@ -50,7 +50,8 @@
 ;; #_"THIS TOKEN IS FOR INTERNAL PARSER PURPOSES! DO NOT USE IT!"
 ;; (def filterQueryCandidateRe
 ;;   (re-pattern
-;;     (str/join "|" [filterExprToken filterDelimiterToken filterBracketToken])))
+;;     (str/join "|" [filterExprToken filterDelimiterToken
+;;     filterBracketToken])))
 
 ;; (def-token fullFilterQueryExpr
 ;;            open-bracket
@@ -65,7 +66,8 @@
 ;;   (fullFilterQueryExpr)
 ;;   (re-seq filterQueryCandidateRe "dsadsa==1$or$ccc<=21")
 ;;   (token-found? fullFilterQueryExpr "name==Adam$and$age>10" :exact)
-;;   (token-found? fullFilterQueryExpr "(name==Adam$and$surname<>kowalski)" :exact)
+;;   (token-found? fullFilterQueryExpr "(name==Adam$and$surname<>kowalski)"
+;;   :exact)
 ;;   (token-found? fullFilterQueryExpr "name==Adam" :exact)
 ;;   (token-found? fullFilterQueryExpr "lalala" :exact)
 ;;   (token-found? fullFilterQueryExpr "<<name" :exact)
@@ -83,8 +85,10 @@
 ;;       (into {} (for [i token-kwords] [i (.group mat (name i))])))))
 
 ;; (comment
-;;   (parse-tokens-from-text "username=Michal" detailToken :fieldToken :valueToken)
-;;   (parse-tokens-from-text "dadsada111,qqqqq222,ooo444" fieldToken :fieldToken)
+;;   (parse-tokens-from-text "username=Michal" detailToken :fieldToken
+;;   :valueToken)
+;;   (parse-tokens-from-text "dadsada111,qqqqq222,ooo444" fieldToken
+;;   :fieldToken)
 ;;   (re-seq #"([a-zA-Z][a-zA-Z0-9]*)|(\"[a-zA-Z][a-zA-Z0-9]*\")"
 ;;           "dadsada111,\"qqqq\"aaa\"q222\",ooo444")
 ;;   (parse-tokens-from-text "<<name" sortToken :fieldToken :sortDirToken))
@@ -117,7 +121,8 @@
 ;;     (assert
 ;;       false
 ;;       (format
-;;         "Unknown symbol: %s! Cannot translate to proper sql logical operator"
+;;         "Unknown symbol: %s! Cannot translate to proper sql logical
+;;         operator"
 ;;         de))))
 
 ;; (comment
@@ -204,7 +209,8 @@
 ;;         p-stack (atom '())]
 ;;     (doall
 ;;       (for [el exprs]
-;;         (if (= el ")") (swap! p-stack reduce-stack) (swap! p-stack conj el))))
+;;         (if (= el ")") (swap! p-stack reduce-stack) (swap! p-stack conj
+;;         el))))
 ;;     (assert (= (count @p-stack) 1))
 ;;     (first @p-stack)))
 
@@ -269,7 +275,8 @@
 ;; (defn sort-builder
 ;;   [selector]
 ;;   (letfn [(single-sort-builder [single-selector]
-;;             (let [parsed-vals (parse-tokens-from-text (first single-selector)
+;;             (let [parsed-vals (parse-tokens-from-text (first
+;;             single-selector)
 ;;                                                       sortToken
 ;;                                                       :fieldToken
 ;;                                                       :sortDirToken)]
@@ -299,8 +306,10 @@
 ;;            tokens)))
 
 ;; (comment
-;;   (multiple-token-found "<<name(name<>admin)" sortToken filterQueryCandidateRe)
-;;   (multiple-token-found "<<name(name<>admin)" sortToken filterQueryCandidateRe)
+;;   (multiple-token-found "<<name(name<>admin)" sortToken
+;;   filterQueryCandidateRe)
+;;   (multiple-token-found "<<name(name<>admin)" sortToken
+;;   filterQueryCandidateRe)
 ;;   (multiple-token-found "1111ddd" #"[0-9]+" #"[a-z]+")
 ;;   (multiple-token-found "13232132189321" #"[0-9]+" #"[a-z]+"))
 
@@ -328,7 +337,8 @@
 ;;             (filter-builder selector)))
 ;;      (syntax-error []
 ;;        (throw-wolth-exception :400
-;;                               (format "Uriql syntax error. Unknown input: %s"
+;;                               (format "Uriql syntax error. Unknown input:
+;;                               %s"
 ;;                                       selector)))]
 ;;     (get-first-matching-pred [all-clause-parser sort-and-filter-parser
 ;;                               sort-parser filter-parser syntax-error])))
