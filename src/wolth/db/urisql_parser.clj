@@ -117,8 +117,6 @@
 
 (def comp-transform-map {"==" :=, "<>" :<>, ">" :>, "<" :<, "<=" :<=, ">=" :>=})
 
-(def logical-transform-map {"and" :and, "or" :or})
-
 (defn- build-single-filter-operation
   [val-map]
   (when (not= (count val-map) 3)

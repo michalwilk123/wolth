@@ -2,13 +2,11 @@
   (:require
     [wolth.utils.common :as utils]
     [wolth.server.exceptions :refer [throw-wolth-exception def-interceptor-fn]]
-    [wolth.db.urisql-parser :refer [apply-uriql-syntax-sugar]]
     [honey.sql :as sql]
-    [ring.util.codec :refer [url-decode]]
     [wolth.server.utils :as server-utils]
     [wolth.server.-test-data :refer
-     [_test-get-request-map _test-delete-request-map _test-patch-request-map
-      _test-post-request-map _serializers_test_app_data _test-object-spec
+     [
+       _serializers_test_app_data _test-object-spec
       _test-object-spec-with-relations-1 _test-object-spec-with-relations-2
       _test-normalized-fields _test-json-body _test-bank-request-map]]
     [wolth.server.bank :as bank-utils]
@@ -157,10 +155,17 @@
                  (list {:fields ["username" "email"],
                         :additional-query "filter(\"role\"=='regular')"})
                  _test-object-spec)
-  (serialize-get {:Country-query "filter(\"countryName\"=='Poland')",
-                  :City-query "filter(\"cityName\"<>'Gdansk')"}
+  (serialize-get {:Country-query "*", :City-query "*"}
                  (list {:fields ["countryName" "code" "president" "cities"]}
                        {:fields ["cityName" "major"]})
+                 (list _test-object-spec-with-relations-1
+                       _test-object-spec-with-relations-2))
+  (serialize-get {:Country-query "filter(\"countryName\"=='Poland')",
+                  :City-query "filter(\"cityName\"<>'Gdansk')"}
+                 (list {:fields ["countryName" "code" "president" "cities"],
+                        :additional-query "filter(\"code\"<>'11111')"}
+                       {:fields ["cityName" "major"],
+                        :additional-query "filter(\"major\"<>'Adam West')"})
                  (list _test-object-spec-with-relations-1
                        _test-object-spec-with-relations-2)))
 
