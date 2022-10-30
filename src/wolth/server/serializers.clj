@@ -9,11 +9,12 @@
     [wolth.server.-test-data :refer
      [_test-get-request-map _test-delete-request-map _test-patch-request-map
       _test-post-request-map _serializers_test_app_data _test-object-spec
+      _test-object-spec-with-relations-1 _test-object-spec-with-relations-2
       _test-normalized-fields _test-json-body _test-bank-request-map]]
     [wolth.server.bank :as bank-utils]
     [wolth.db.uriql :refer
-     [build-select merge-select-hsql merge-hsql-queries build-single-hsql-map
-      build-delete]]
+     [ merge-hsql-queries build-single-hsql-map
+      ]]
     [wolth.server.config :refer [def-context app-data-container]]
     [wolth.db.fields :as fields]))
 
@@ -137,21 +138,33 @@
   (let [serializer-fields (map #(map keyword (% :fields)) serializer-specs)
         additional-subqueries (map :additional-query serializer-specs)
         object-names (map #(get % :name) objects-data)
+        ordered-path-params (server-utils/get-query-urls-in-order object-names
+                                                                  path-params)
+        relations-data (server-utils/get-serialized-relation-data
+                         serializer-fields
+                         objects-data)
         queries (map str
-                  (map server-utils/sanitize-uriql-query (vals path-params))
+                  (map server-utils/sanitize-uriql-query ordered-path-params)
                   additional-subqueries)]
     (->> (map (partial build-single-hsql-map :select)
            object-names
            queries
            serializer-fields)
-         (merge-hsql-queries :select objects-data)
-         (sql/format))))
+         (merge-hsql-queries :select relations-data)
+          (sql/format)
+    )))
 
 (comment
-  (serialize-get {:personQuery "sorta(\"name\")"}
+  (serialize-get {:User-query "filter(\"name\"=='John')"}
                  (list {:fields ["username" "email"],
                         :additional-query "filter(\"role\"=='regular')"})
-                 _test-object-spec))
+                 _test-object-spec)
+  (serialize-get {:Country-query "filter(\"countryName\"=='Poland')",
+                  :City-query "filter(\"cityName\"<>'Gdansk')"}
+                 (list {:fields ["countryName" "code" "president" "cities"]}
+                       {:fields ["cityName" "major"]})
+                 (list _test-object-spec-with-relations-1
+                       _test-object-spec-with-relations-2)))
 
 
 (defn- serialize-patch
@@ -222,10 +235,10 @@
                                             (get request-data :request-method))
         body-params (get request-data :json-params)
         request-method (get request-data :request-method)
-        path-params (get request-data :path-params)
         app-data (server-utils/get-associated-app-data! app-name)
         objects-data (server-utils/get-associated-objects (app-data :objects)
                                                           tables)
+        path-params (get request-data :path-params)
         _raw-serializer-data (utils/find-first #(= serializer-name (% :name))
                                                (get app-data :serializers))
         _related-serializer-spec (server-utils/get-related-serializer-spec
