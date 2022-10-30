@@ -149,14 +149,30 @@
                             {:type "comparisonToken", :value "=="}
                             {:type "fieldToken", :value "\"name\""})))
 
-(defn- eval-logic-filter-expr
-  [l-val operation-str r-val]
-  (let [operation (or (logical-transform-map operation-str)
-                      (throw-uriql-exception (str "Unknown operation: "
-                                                  operation-str)))]
-    (if (= operation (first r-val) (first l-val))
-      [operation (vec (rest r-val)) (vec (rest l-val))]
-      [operation r-val l-val])))
+(defn merge-where-clauses
+  [operation & clauses]
+  (reduce
+    (fn [acc it]
+      (cond (nil? acc) it
+            (nil? it) acc
+            (= (first acc) (first it) operation)
+              (vec (cons operation (concat (rest acc) (rest it))))
+            (= (first acc) operation) (conj acc it)
+            (= (first it) operation) (conj it acc)
+            :else [operation acc it]))
+    nil
+    clauses))
+
+(comment
+  (merge-where-clauses :and nil [:> :age 11])
+  (merge-where-clauses :and [:> :age 11] nil)
+  (merge-where-clauses :and [:= :id "dsdsa"] [:> :age 11])
+  (merge-where-clauses :and [:and [:= :id "dsdsa"] [:> :age 11]] [:> :age 11])
+  (merge-where-clauses :and
+                       [:and [:= :id "dsdsa"] [:> :age 11]]
+                       [:and [:= :name "lalal"] [:<> :surname "aaaa"]])
+  (merge-where-clauses :and [:> :age 11] [:and [:= :id "dsdsa"] [:> :age 11]])
+  (merge-where-clauses :and [:or [:= :id "dsdsa"] [:> :age 11]] [:> :age 11]))
 
 (defn- evaluate-filter-stack
   [acc]
@@ -171,7 +187,10 @@
       (-> updated-acc
           (update :stack (partial drop 3))
           (update :stack
-                  (partial cons (apply eval-logic-filter-expr stack-tokens))))
+                  (partial cons
+                           (merge-where-clauses (keyword (nth stack-tokens 1))
+                                                (nth stack-tokens 0)
+                                                (nth stack-tokens 2)))))
       (assoc updated-acc :stack stack-tokens))))
 
 (defn- filter-reducer-fn
@@ -363,18 +382,15 @@
 
 (defn build-honeysql-exprs
   [parse-struct]
-  (letfn [(merge-where-clauses [filter-exps]
-            (if (= (count filter-exps) 1)
-              (first filter-exps)
-              (apply vector (cons :and filter-exps))))]
-    (cond-> parse-struct
-      (not-empty (parse-struct :filter-exprs))
-        (assoc :where (merge-where-clauses (parse-struct :filter-exprs)))
-      (not-empty (parse-struct :sort-exprs)) (assoc :order-by
-                                               (parse-struct :sort-exprs))
-      (parse-struct :offset-expr) (assoc :offset (parse-struct :offset-expr))
-      (parse-struct :limit-expr) (assoc :limit (parse-struct :limit-expr))
-      :finally (select-keys [:where :order-by :offset :limit]))))
+  (cond-> parse-struct
+    (not-empty (parse-struct :filter-exprs))
+      (assoc :where
+        (apply (partial merge-where-clauses :and) (parse-struct :filter-exprs)))
+    (not-empty (parse-struct :sort-exprs)) (assoc :order-by
+                                             (parse-struct :sort-exprs))
+    (parse-struct :offset-expr) (assoc :offset (parse-struct :offset-expr))
+    (parse-struct :limit-expr) (assoc :limit (parse-struct :limit-expr))
+    :finally (select-keys [:where :order-by :offset :limit])))
 
 (defn apply-uriql-syntax-sugar
   [query]
@@ -398,9 +414,10 @@
 
 ;; Correct queries
 (comment
-  ;; (parse-uriql "\"id\"=='jo8wqn-2189nd-a7sas2-qeqwb1'")
   (parse-uriql
     "filter(\"name\"=='1'and\"age\">'10')filter(\"surname\"<>'Kowalski')")
+  (parse-uriql
+    "filter(\"name\"=='1'or\"age\">'10')filter(\"surname\"<>'Kowalski')")
   (parse-uriql "filter(\"name\"=='Lorem Ipsum\\( 123 111-222-333')")
   (parse-uriql "filter(\"name\"=='123 __===++--*^&*%$#@!')")
   (parse-uriql "sorta(\"name\")")
@@ -410,6 +427,10 @@
     "filter(\"name\"=='1'and\"surname\"<>'Kowalski')sortd(\"name\")filter(\"age\">'10')")
   (parse-uriql "")
   (parse-uriql "filter((\"aa\"=='bb'and\"cc\">'10')or\"dd\"<>'ee')")
+  (parse-uriql "filter(\"aa\"=='bb'and\"cc\">'10')")
+  (parse-uriql "filter((\"aa\"=='bb'and\"cc\">'10')and\"dd\"<>'ee')")
+  (parse-uriql
+    "filter((\"aa\"=='bb'and\"cc\">'10'))filter((\"dd\"<>'ee'and\"ff\">'10'))")
   (parse-uriql
     "sortd(\"surname\")filter((\"aa\"=='bb'and\"cc\">'10')or\"dd\"<>'ee')sorta(\"name\")")
   (parse-uriql

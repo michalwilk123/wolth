@@ -1,6 +1,6 @@
 (ns wolth.db.uriql
   (:require clojure.walk
-            [wolth.db.urisql-parser :refer [parse-uriql]]
+            [wolth.db.urisql-parser :refer [parse-uriql merge-where-clauses]]
             [wolth.server.exceptions :refer [throw-wolth-exception]]
             [wolth.utils.common :refer
              [concat-vec-field-in-maps concatv remove-nil-vals-from-map]]))
@@ -131,30 +131,24 @@
                        (list "T1" "T2" "T3")
                        (list :User :Assignment :Class)))
 
-
-(defn- merge-where-clauses
-  [filter-query current]
-  (cond (nil? filter-query) current
-        (nil? current) filter-query
-        (= (first current) :and) (conj (conj current filter-query))
-        (vector? current) (vector :and current filter-query)
-        :else filter-query))
-
-(comment
-  (merge-where-clauses nil [:> :age 11])
-  (merge-where-clauses [:= :id "dsdsa"] [:> :age 11])
-  (merge-where-clauses [:and [:= :id "dsdsa"] [:> :age 11]] [:> :age 11]))
-
 (defn- merge-select-simple
   [queries]
-  (println queries)
   (->> {:select (concat-vec-field-in-maps queries :select),
         :from (first (map :from queries)),
         :order-by (concat-vec-field-in-maps queries :order-by),
-        :where (vec (cons :and (map :where queries)))}
+        :where (apply (partial merge-where-clauses :and) (map :where queries))}
        (remove-nil-vals-from-map)))
 
 (comment
+  (merge-select-simple
+    (list {:select :T1.*,
+           :from [:FirstTable :T1],
+           :order-by [[:T2.name :desc]],
+           :where [:> :T1.ll 100]}
+          {:select :T2.*, :from [:SecTable :T2], :where [:= :T2.aa "qqq"]}))
+  (merge-select-simple
+    (list {:select :T1.*, :from [:FirstTable :T1], :order-by [[:T2.name :desc]]}
+          {:select :T2.*, :from [:SecTable :T2]}))
   (merge-select-simple (list {:select :T1.*,
                               :from [:FirstTable :T1],
                               :order-by [[:T2.name :desc]],
