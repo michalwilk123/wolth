@@ -1,12 +1,16 @@
 (ns wolth.server.utils
   (:require [clojure.string :as str]
+            [clojure.set :refer [difference]]
             [ring.util.codec :refer [url-decode]]
             [wolth.db.urisql-parser :refer [apply-uriql-syntax-sugar]]
-            [wolth.server.-test-data :refer [_server_test_app_data]]
+            [wolth.server.-test-data :refer
+             [_server_test_app_data _test-object-spec-with-relations-1
+              _test-object-spec-with-relations-2]]
             [wolth.server.config :refer [app-data-container]]
             [wolth.server.exceptions :refer
              [def-interceptor-fn throw-wolth-exception]]
-            [wolth.utils.common :as common]))
+            [wolth.utils.common :as common]
+            [wolth.db.fields :as fields]))
 
 (def operations-lut
   {:post :create, :delete :delete, :get :read, :patch :update})
@@ -109,3 +113,66 @@
   (-> query
       (url-decode)
       (apply-uriql-syntax-sugar)))
+
+
+(defn get-query-urls-in-order
+  [objects-names query-params]
+  (when (not= (count objects-names) (count query-params))
+    (throw-wolth-exception
+      :400
+      "Cannot parse all parameters needed to build the query"))
+  (map (fn [it]
+         (->> it
+              (format "%s-query")
+              (keyword)
+              (get query-params)))
+    objects-names))
+
+(comment
+  (get-query-urls-in-order (list "User") {:User-query "*"})
+  (get-query-urls-in-order (list "Country" "City")
+                           {:Country-query "filter(\"countryName\"=='Poland')",
+                            :City-query "filter(\"cityName\"<>'Gdansk')"}))
+
+
+(defn- get-correct-relation-info
+  [fields [l-object r-object]]
+  (let [field-to-search (first (difference (set fields)
+                                           (set (map #(-> %
+                                                          (get :name)
+                                                          (keyword))
+                                                  (l-object :fields)))))
+        l-relation (common/find-first #(= (name field-to-search)
+                                          (% :related-name-inside))
+                                      (get l-object :relations))
+        r-relation (common/find-first #(= (name field-to-search)
+                                          (% :related-name-outside))
+                                      (get r-object :relations))]
+    (-> (cond l-relation {:joint [(l-relation :name) "id"],
+                          :field-to-inject field-to-search}
+              r-relation {:joint ["id" (r-relation :name)],
+                          :field-to-inject field-to-search}
+              :else (throw-wolth-exception
+                      :500
+                      (format "Could not join two objects: %s and %s"
+                              l-object
+                              r-object)))
+        (update :joint (partial mapv keyword)))))
+
+(defn get-serialized-relation-data
+  [fields objects-data]
+  (map get-correct-relation-info fields (partition 2 1 objects-data)))
+
+(comment
+  (get-correct-relation-info [:countryName :code :president :cities]
+                             (list _test-object-spec-with-relations-1
+                                   _test-object-spec-with-relations-2))
+  (get-correct-relation-info [:cityName :major :country]
+                             (list _test-object-spec-with-relations-2
+                                   _test-object-spec-with-relations-1))
+  (get-serialized-relation-data (list [:countryName :code :president :cities]
+                                      [:cityName :major])
+                                (list _test-object-spec-with-relations-1
+                                      _test-object-spec-with-relations-2))
+  (get-serialized-relation-data (list [:countryName :president])
+                                (list _test-object-spec-with-relations-1)))
