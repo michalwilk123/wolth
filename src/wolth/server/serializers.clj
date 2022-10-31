@@ -5,8 +5,7 @@
     [honey.sql :as sql]
     [wolth.server.utils :as server-utils]
     [wolth.server.-test-data :refer
-     [
-       _serializers_test_app_data _test-object-spec
+     [_serializers_test_app_data _test-object-spec
       _test-object-spec-with-relations-1 _test-object-spec-with-relations-2
       _test-normalized-fields _test-json-body _test-bank-request-map]]
     [wolth.server.bank :as bank-utils]
@@ -132,13 +131,13 @@
 (defn- serialize-get
   [path-params serializer-specs objects-data]
   (let [serializer-fields (map #(map keyword (% :fields)) serializer-specs)
+        model-fields (map :model-fields serializer-specs)
         additional-subqueries (map :additional-query serializer-specs)
         object-names (map #(get % :name) objects-data)
         ordered-path-params (server-utils/get-query-urls-in-order object-names
                                                                   path-params)
-        relations-data (server-utils/get-serialized-relation-data
-                         serializer-fields
-                         objects-data)
+        relations-data (server-utils/get-serialized-relation-data model-fields
+                                                                  objects-data)
         queries (map str
                   (map server-utils/sanitize-uriql-query ordered-path-params)
                   additional-subqueries)]
@@ -147,8 +146,7 @@
            queries
            serializer-fields)
          (merge-hsql-queries :select relations-data)
-         ;;  (sql/format)
-    )))
+         (sql/format))))
 
 (comment
   (serialize-get {:User-query "filter(\"name\"=='John')"}
@@ -156,14 +154,16 @@
                         :additional-query "filter(\"role\"=='regular')"})
                  _test-object-spec)
   (serialize-get {:Country-query "*", :City-query "*"}
-                 (list {:fields ["countryName" "code" "president" "cities"]}
+                 (list {:fields ["countryName" "code" "president"],
+                        :model-fields ["cities"]}
                        {:fields ["cityName" "major"]})
                  (list _test-object-spec-with-relations-1
                        _test-object-spec-with-relations-2))
   (serialize-get {:Country-query "filter(\"countryName\"=='Poland')",
                   :City-query "filter(\"cityName\"<>'Gdansk')"}
                  (list {:fields ["countryName" "code" "president" "cities"],
-                        :additional-query "filter(\"code\"<>'11111')"}
+                        :additional-query "filter(\"code\"<>'11111')",
+                        :model-fields ["cities"]}
                        {:fields ["cityName" "major"],
                         :additional-query "filter(\"major\"<>'Adam West')"})
                  (list _test-object-spec-with-relations-1

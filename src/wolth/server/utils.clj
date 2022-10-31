@@ -134,24 +134,47 @@
                            {:Country-query "filter(\"countryName\"=='Poland')",
                             :City-query "filter(\"cityName\"<>'Gdansk')"}))
 
+(defn- find-matching-relation-data
+  [fields model-data other-model-name-to-match & {:keys [related-inside?]}]
+  (let [field-to-fetch
+          (if related-inside? :related-name-inside :related-name-outside)]
+    (letfn [(field-exists-in-relation? [rel-data field]
+              (and (= field (get rel-data field-to-fetch))
+                   (= other-model-name-to-match (get rel-data :references))))
+            (relation-exists-in-object? [relation]
+              (common/find-first (partial field-exists-in-relation? relation)
+                                 fields))]
+      (common/find-first relation-exists-in-object?
+                         (get model-data :relations)))))
+
+(comment
+  (find-matching-relation-data ["cities"]
+                               _test-object-spec-with-relations-1
+                               "City"
+                               :related-inside?
+                               true)
+  (find-matching-relation-data ["cities"]
+                               _test-object-spec-with-relations-2
+                               "Country"
+                               :related-inside?
+                               false))
 
 (defn- get-correct-relation-info
   [fields [l-object r-object]]
-  (let [field-to-search (first (difference (set fields)
-                                           (set (map #(-> %
-                                                          (get :name)
-                                                          (keyword))
-                                                  (l-object :fields)))))
-        l-relation (common/find-first #(= (name field-to-search)
-                                          (% :related-name-inside))
-                                      (get l-object :relations))
-        r-relation (common/find-first #(= (name field-to-search)
-                                          (% :related-name-outside))
-                                      (get r-object :relations))]
+  (let [l-relation (find-matching-relation-data fields
+                                                l-object
+                                                (r-object :name)
+                                                :related-inside?
+                                                true)
+        r-relation (find-matching-relation-data fields
+                                                r-object
+                                                (l-object :name)
+                                                :related-inside?
+                                                false)]
     (-> (cond l-relation {:joint [(l-relation :name) "id"],
-                          :field-to-inject field-to-search}
+                          :field-to-inject (l-relation :related-name-inside)}
               r-relation {:joint ["id" (r-relation :name)],
-                          :field-to-inject field-to-search}
+                          :field-to-inject (r-relation :related-name-outside)}
               :else (throw-wolth-exception
                       :500
                       (format "Could not join two objects: %s and %s"
@@ -164,15 +187,17 @@
   (map get-correct-relation-info fields (partition 2 1 objects-data)))
 
 (comment
-  (get-correct-relation-info [:countryName :code :president :cities]
+  (get-correct-relation-info ["WRONG FIELD"]
                              (list _test-object-spec-with-relations-1
                                    _test-object-spec-with-relations-2))
-  (get-correct-relation-info [:cityName :major :country]
+  (get-correct-relation-info ["cities"]
+                             (list _test-object-spec-with-relations-1
+                                   _test-object-spec-with-relations-2))
+  (get-correct-relation-info ["country"]
                              (list _test-object-spec-with-relations-2
                                    _test-object-spec-with-relations-1))
-  (get-serialized-relation-data (list [:countryName :code :president :cities]
-                                      [:cityName :major])
+  (get-serialized-relation-data (list ["cities"] [])
                                 (list _test-object-spec-with-relations-1
                                       _test-object-spec-with-relations-2))
-  (get-serialized-relation-data (list [:countryName :president])
+  (get-serialized-relation-data (list ["cities"])
                                 (list _test-object-spec-with-relations-1)))

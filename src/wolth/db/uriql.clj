@@ -31,7 +31,7 @@
 
 (defn hydrate-from-clause
   [as-kw query]
-  (assoc query :from (vector (query :from) (keyword as-kw))))
+  (assoc query :from (vector (vector (query :from) (keyword as-kw)))))
 
 (defn hydrate-fields-clause
   [as-kw query]
@@ -181,8 +181,7 @@
         hydrated-fields (hydrate-join-fields join-fields as-kws table-names)]
     (->> hydrated-queries
          (merge-select-simple)
-         ;;  (hydrate-queries-with-joins hydrated-fields)
-    )))
+         (hydrate-queries-with-joins hydrated-fields))))
 
 (comment
   (join-queries (list test-select-query-1 test-select-query-2)
@@ -203,20 +202,20 @@
 ;;     [:and [:or [:> "age" 100] [:= "owner" "Michał"]] [:= "name" "John"]]))
 
 
-(defn attach-optional-filter-query
-  [subquery filter-query]
-  (if filter-query
-    (update-in subquery [:where] (partial merge-where-clauses filter-query))
-    subquery))
+;; (defn attach-optional-filter-query
+;;   [subquery filter-query]
+;;   (if filter-query
+;;     (update-in subquery [:where] (partial merge-where-clauses filter-query))
+;;     subquery))
 
-(comment
-  (attach-optional-filter-query {:where [:or [:= :role "regular"]
-                                         [:<> :surname "Kowalski"]]}
-                                [:= "owner" "Michał"])
-  (attach-optional-filter-query {:where [:and [:= :role "regular"]
-                                         [:<> :surname "Kowalski"]]}
-                                [:= "owner" "Michał"])
-  (attach-optional-filter-query {} [:= "owner" "Michał"]))
+;; (comment
+;;   (attach-optional-filter-query {:where [:or [:= :role "regular"]
+;;                                          [:<> :surname "Kowalski"]]}
+;;                                 [:= "owner" "Michał"])
+;;   (attach-optional-filter-query {:where [:and [:= :role "regular"]
+;;                                          [:<> :surname "Kowalski"]]}
+;;                                 [:= "owner" "Michał"])
+;;   (attach-optional-filter-query {} [:= "owner" "Michał"]))
 
 
 (defn build-single-hsql-map
