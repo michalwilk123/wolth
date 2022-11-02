@@ -197,3 +197,36 @@
    :function-data {:function-name "getDate", :function-args '(50)}})
 
 ; =============== TEST DATA FOR resolvers.clj ================ END
+
+
+; =============== TEST DATA FOR routes.clj ================ START
+
+(def _routes-related-app-data
+  {:objects
+     [{:name "Country",
+       :fields [{:constraints [:not-null], :name "countryName", :type :str128}
+                {:constraints [:unique], :name "code", :type :int}
+                {:constraints [:unique], :name "president", :type :str128}]}
+      {:name "City",
+       :fields [{:constraints [:not-null], :name "cityName", :type :str128}
+                {:constraints [], :name "creationData", :type :str128}
+                {:constraints [], :name "major", :type :str128}],
+       :relations [{:name "country_id",
+                    :references "Country",
+                    :rel-type :o2m,
+                    :related-name-inside "country",
+                    :related-name-outside "cities"}]}],
+   :serializers
+     [{:name "regular-view",
+       :allowed-roles ["regular"],
+       :operations [{:model "Country",
+                     :delete true,
+                     :read {:fields ["countryName" "code" "president" "cities"],
+                            :additional-query "filter(\"code\"<>'11111')",
+                            :model-fields ["cities"]}}
+                    {:model "City",
+                     :read {:fields ["cityName" "major"],
+                            :additional-query "filter(\"major\"<>'Adam West')",
+                            :model-fields ["country"]}}]}]})
+
+; =============== TEST DATA FOR routes.clj ================ END

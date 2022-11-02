@@ -22,13 +22,12 @@
  :serializers
    [{:allowed-roles ["admin"],
      :name "public",
-     :operations
-       [{:create {:attached [["note" "Testowa notatka"]], :fields ["name"]},
-         :delete true,
-         :model "Person",
-         :read {:additional-query "filter(\"author\"==<:user-id>)",
-                :fields ["name" "note" "id"],
-                :join-with [{:model "Post", :relation-field "author"}]},
-         :update {:fields ["name"]}}]}]}
+     :operations [{:create
+                     {:attached [["note" "Testowa notatka"]], :fields ["name"]},
+                   :delete true,
+                   :model "Person",
+                   :read {:additional-query "filter(\"author\"==<:user-id>)",
+                          :fields ["name" "note" "id"]},
+                   :update {:fields ["name"]}}]}]}
 
 ;; /app/Person/*/Post/*/Comennts/*/public
