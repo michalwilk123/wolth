@@ -1,6 +1,6 @@
 (ns wolth.server.utils
   (:require [clojure.string :as str]
-            [clojure.set :refer [difference]]
+            [clojure.set :refer [difference map-invert]]
             [ring.util.codec :refer [url-decode]]
             [wolth.db.urisql-parser :refer [apply-uriql-syntax-sugar]]
             [wolth.server.-test-data :refer
@@ -14,6 +14,8 @@
 
 (def operations-lut
   {:post :create, :delete :delete, :get :read, :patch :update})
+
+(def actions-lut (map-invert operations-lut))
 
 (defn get-associated-app-data!
   [app-name]
@@ -114,6 +116,7 @@
       (url-decode)
       (apply-uriql-syntax-sugar)))
 
+(defn create-query-name [model-name] (format "%s-query" model-name))
 
 (defn get-query-urls-in-order
   [objects-names query-params]
@@ -123,7 +126,7 @@
       "Cannot parse all parameters needed to build the query"))
   (map (fn [it]
          (->> it
-              (format "%s-query")
+              (create-query-name)
               (keyword)
               (get query-params)))
     objects-names))
@@ -153,7 +156,7 @@
                                "City"
                                :related-inside?
                                true)
-  (find-matching-relation-data ["cities"]
+  (find-matching-relation-data ["lalalal" "cities"]
                                _test-object-spec-with-relations-2
                                "Country"
                                :related-inside?
