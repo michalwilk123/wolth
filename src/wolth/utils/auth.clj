@@ -213,8 +213,9 @@
           (throw-wolth-exception :403 "View temporarily unavailable")
         (not (.contains allowed-roles user-role))
           (throw-wolth-exception
-            :403
-            "User with this role has no access to this view!"))
+            :403 (format "User with this role: %s has no access to this view"
+                         user-role)
+            :extra-info (str "Allowed roles: " allowed-roles)))
   true)
 
 (comment
