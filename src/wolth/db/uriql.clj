@@ -162,9 +162,31 @@
 (comment
   (join-map-to-clause {:joint [:T1.id :T2.author], :tab-data [:Task :T2]}))
 
+(defn left-join?
+  [join-field]
+  (when (re-matches #"(?i)T[0-9]+\.id"
+                    (-> join-field
+                        (get-in [:joint 0])
+                        (name)))
+    true))
+
+(comment
+  (left-join? {:joint [:T1.id :T2.author], :tab-data [:SecondTable :T2]}))
+
 (defn- hydrate-queries-with-joins
   [join-fields query]
-  (assoc query :left-join (concatv (map join-map-to-clause join-fields))))
+  (let [[l-joins r-joins] (reduce (fn [acc el]
+                                    (if (left-join? el)
+                                      (update acc 0 (fn [l] (conj l el)))
+                                      (update acc 1 (fn [l] (conj l el)))
+                                      ))
+                            [[] []]
+                            join-fields)]
+    (cond-> query
+      (not-empty l-joins) (assoc :left-join
+                            (concatv (map join-map-to-clause l-joins)))
+      (not-empty r-joins) (assoc :right-join
+                        (concatv (map join-map-to-clause r-joins))))))
 
 (comment
   (hydrate-queries-with-joins
