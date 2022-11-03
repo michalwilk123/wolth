@@ -13,12 +13,15 @@
 
 
 (defn throw-wolth-exception
-  ([code additional-info]
+  ([code additional-info & {:keys [extra-info], :or {extra-info nil}}]
    (if-let [exc-message (exceptions-map code)]
      (let [payload {:status (Integer/parseInt (name code)),
                     :body (or additional-info exc-message)}]
        (println payload)
-       (log/error ::WOLTH-EXCEPTION payload)
+       (log/error ::WOLTH-EXCEPTION
+                  (if extra-info
+                    (format "%s. Extra info: %s" payload extra-info)
+                    payload))
        (throw (ex-info "WolthException" payload)))
      (throw-wolth-exception :500
                             (str "Unknown exception code thrown: "
