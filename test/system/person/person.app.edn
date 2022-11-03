@@ -8,13 +8,12 @@
  :meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
  :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
                      {:name "note", :type :text}],
-            :name "Person",
-            :options [:uuid-identifier]}
+            :name "Writer",
+            }
            {:fields [{:name "content", :type :text}],
             :name "Post",
-            :options [:uuid-identifier],
             :relations [{:name "author",
-                         :references "Person",
+                         :references "Writer",
                          :rel-type :o2m,
                          :related-name-inside "author",
                          :related-name-outside "posts"}]}],
@@ -25,9 +24,15 @@
      :operations [{:create
                      {:attached [["note" "Testowa notatka"]], :fields ["name"]},
                    :delete true,
-                   :model "Person",
-                   :read {:additional-query "filter(\"author\"==<:user-id>)",
-                          :fields ["name" "note" "id"]},
-                   :update {:fields ["name"]}}]}]}
-
-;; /app/Person/*/Post/*/Comennts/*/public
+                   :model "Writer",
+                   :read { :additional-query "sorta(\"name\")",
+                          :fields ["name" "note" "id"]
+                          :model-fields ["posts"]},
+                   :update {:fields ["name"]}}
+                   {:model "Post"
+                    :create {:fields ["author" "content" ]}
+                    :read {:fields ["author" "content" "id"]}
+                    :update true
+                    :delete true
+                    }
+                  ]}]}

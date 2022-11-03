@@ -95,15 +95,15 @@
 (def _test-patch-request-map
   {:logged-user {:username "Przemek", :id 22222},
    :request {:json-params {:username "Marek"},
-             :uri "/test-app/User/username==Przemek/public",
-             :path-params {:User-query "username==Przemek"},
+             :uri "/test-app/User/\"username\"=='Przemek'/public",
+             :path-params {:User-query "\"username\"=='Przemek'"},
              :request-method :patch}})
 
 (def _test-delete-request-map
   {:logged-user {:username "Przemek", :id 22222},
    :request {:json-params {},
              :uri "/test-app/User/*/public",
-             :path-params {:User-query "username==Przemek"},
+             :path-params {:User-query "\"username\"=='Przemek'"},
              :request-method :delete}})
 
 (def _test-bank-request-map
@@ -201,7 +201,7 @@
 
 ; =============== TEST DATA FOR routes.clj ================ START
 
-(def _routes-related-app-data
+(def _test-app-data-w-relations
   {:objects
      [{:name "Country",
        :fields [{:constraints [:not-null], :name "countryName", :type :str128}
