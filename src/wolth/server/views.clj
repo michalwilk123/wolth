@@ -1,18 +1,18 @@
 (ns wolth.server.views
   (:require [wolth.server.exceptions :refer [def-interceptor-fn]]
             [clojure.spec.alpha :as s]
-            [wolth.utils.common :refer [sql-map->map]]))
+            [wolth.utils.common :refer [sql-map->map create-nested-sql-result]]))
 
 
 (defn create-model-view
   [ctx]
   (let [result (get ctx :model-result)
+        join-fields (get ctx :relation-fields)
+        table-names (get ctx :table-names)
         request-method (get-in ctx [:request :request-method])
         response (case request-method
                    :get {:status 200,
-                         :body (if (coll? result)
-                                 (map sql-map->map result)
-                                 (sql-map->map result))}
+                         :body (create-nested-sql-result result table-names join-fields)}
                    :post {:status 201, :body {:message "Created data"}}
                    :patch {:status 200, :body {:message "Updated data"}}
                    :delete {:status 200, :body {:message "Deleted data"}})]

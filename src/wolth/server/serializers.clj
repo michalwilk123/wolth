@@ -7,7 +7,9 @@
     [wolth.server.-test-data :refer
      [_serializers_test_app_data _test-object-spec
       _test-object-spec-with-relations-1 _test-object-spec-with-relations-2
-      _test-normalized-fields _test-json-body _test-bank-request-map]]
+      _test-normalized-fields _test-json-body _test-bank-request-map
+      _test-app-data-w-relations _test-post-request-map _test-get-request-map
+      _test-patch-request-map _test-delete-request-map]]
     [wolth.server.bank :as bank-utils]
     [wolth.db.uriql :refer [merge-hsql-queries build-single-hsql-map]]
     [wolth.server.config :refer [def-context app-data-container]]
@@ -33,7 +35,8 @@
 
 (defn- attatch-field-to-object
   [object-data field]
-  (let [object-fields (object-data :fields)
+  (let [object-fields (concat (get object-data :relations)
+                              (object-data :fields))
         [key value] field
         related-table (utils/find-first #(= (% :name) (name key))
                                         object-fields)]
@@ -41,6 +44,8 @@
 
 (comment
   (attatch-field-to-object (first _test-object-spec) [:username "Mariusz"])
+  (attatch-field-to-object (second (_test-app-data-w-relations :objects))
+                           [:country_id 123])
   (attatch-field-to-object (first _test-object-spec) [:unknownfield 123]))
 
 
@@ -75,7 +80,7 @@
          (if-not (every? some? v-fields)
            (throw-wolth-exception :400
                                   (str "Could not populate all fields: "
-                                       v-fields))
+                                       (vec v-fields)))
            v-fields))]
       (->> params
            (map (partial attatch-field-to-object object-data))
@@ -146,7 +151,9 @@
            queries
            serializer-fields)
          (merge-hsql-queries :select relations-data)
-         (sql/format))))
+         (sql/format)
+         (assoc {:relation-fields (map :field-to-inject relations-data) :table-names object-names}
+           :sql-query))))
 
 (comment
   (serialize-get {:User-query "filter(\"name\"=='John')"}
@@ -229,6 +236,12 @@
                              "filter(\"createdAt\"<'10-10-2020')"})
                     _test-object-spec))
 
+(defn hydrate-context
+  [ctx serializer-output]
+  (if (map? serializer-output)
+    (merge ctx serializer-output)
+    (assoc ctx :sql-query serializer-output)))
+
 (def-interceptor-fn
   serialize-into-model
   [ctx]
@@ -263,7 +276,7 @@
         :delete (serialize-delete path-params
                                   normalized-serializer-spec
                                   objects-data))
-      (assoc ctx :sql-query))))
+      (hydrate-context ctx))))
 
 (comment
   (_test-context '(serialize-into-model _test-post-request-map))

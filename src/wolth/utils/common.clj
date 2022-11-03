@@ -1,5 +1,6 @@
 (ns wolth.utils.common
   (:require [clojure.string :as str]
+            [wolth.db.utils :refer [execute-sql-expr!]]
             [io.pedestal.log :as log]))
 
 
@@ -65,6 +66,7 @@
 (comment
   (cons-not-nil 11 [1 2 3 4])
   (cons-not-nil 11 nil)
+  (cons-not-nil nil '(1 2 3))
   (cons-not-nil nil [1 2 3 4]))
 
 
@@ -94,26 +96,6 @@
   (assoc-vector {:aaa 123, :bbb 111} [["ccc" 333] ["bbb" 999]])
   (assoc-vector {:aaa 123, :bbb 111} [["ccc" 333] ["ddd" 999]]))
 
-(defn sql-map->map
-  [nmap]
-  (log/info ::sql-map->map nmap)
-  (into {}
-        (map (fn [[k val]]
-               [(-> k
-                    (name)
-                    (str/split #"/")
-                    (last)
-                    (str/lower-case)
-                    (keyword)) val])
-          nmap)))
-
-
-(comment
-  (sql-map->map #:USER{:ID "440b753d-1928-4007-bcd5-392ef5b3d0e7",
-                 :USERNAME "admin",
-                 :PASSWORD "haslo",
-                 :ROLE "admin",
-                 :EMAIL nil}))
 
 (defn zip [& colls] (partition (count colls) (apply interleave colls)))
 
@@ -204,3 +186,178 @@
 
 (comment
   (remove-nil-vals-from-map {:dsadsa 321, :popop nil, :ooo "dsadsa"}))
+
+(defn clob-to-string
+  [obj]
+  (let [parsed-clob (-> obj
+                        (.toString)
+                        (str/replace-first #"clob[0-9]+: " "")
+                        (trim-string))]
+    (.free obj)
+    parsed-clob)) ;;TODO: this is very hacky and should be improved for sure
+
+(defn translate-to-readable-form
+  [val]
+  (if (instance? java.sql.Clob val) (clob-to-string val) val))
+
+(comment
+  (translate-to-readable-form 1)
+  (->> (execute-sql-expr!
+         "person"
+         ["SELECT name, note, id FROM Writer ORDER BY name ASC"])
+       (first)
+       (:WRITER/NOTE)
+       (translate-to-readable-form))
+  (->> (execute-sql-expr! "person" ["SELECT AUTHOR, CONTENT FROM Post"])))
+
+(defn sql-map->map
+  [nmap]
+  (log/info ::sql-map->map nmap)
+  (into {}
+        (map (fn [[k val]]
+               [(-> k
+                    (name)
+                    (str/split #"/")
+                    (last)
+                    (str/lower-case)
+                    (keyword)) (translate-to-readable-form val)])
+          nmap)))
+
+
+(comment
+  (sql-map->map #:USER{:ID "440b753d-1928-4007-bcd5-392ef5b3d0e7",
+                 :USERNAME "admin",
+                 :PASSWORD "haslo",
+                 :ROLE "admin",
+                 :EMAIL nil}))
+
+(defn parse-multitable-sql-result
+  [sql-map]
+  (letfn [(get-tab-name [key]
+            (-> key
+                (str)
+                (str/split #"\/")
+                (first)
+                (subs 1)))]
+    (reduce
+      (fn [acc [k value]]
+        (update acc
+                (get-tab-name k)
+                (fn [m]
+                  (assoc m
+                    (-> k
+                        (name)
+                        (str/lower-case)
+                        (keyword))
+                      (translate-to-readable-form value)))))
+      {}
+      sql-map)))
+
+(comment
+  (parse-multitable-sql-result {:WRITER/NAME "writer3",
+                                :WRITER/NOTE "Testowa notatka",
+                                :WRITER/ID 3,
+                                :POST/ID 3,
+                                :POST/AUTHOR 3,
+                                :POST/CONTENT "pierwszy post"}))
+
+(defn squash-maps
+  [maps table-names]
+  (if (= (count table-names) 1)
+    (map (fn [el] (get el (first table-names))) maps)
+    (let [tab-1 (first table-names)]
+      (as-> maps it
+        (reduce (fn [acc el]
+                  (update acc (el tab-1) (partial cons (dissoc el tab-1))))
+          {}
+          it)
+        (map (fn [[k val]] [k (squash-maps val (rest table-names))]) it)
+        (into {} it)))))
+
+(comment
+  (squash-maps [{"tab1" {:aa 1}, "tab2" {:dd "bb"}}
+                {"tab1" {:aa 2}, "tab2" {:dd "aa"}}
+                {"tab1" {:aa 2}, "tab2" {:dd "gg"}}]
+               (list "tab1" "tab2"))
+  (squash-maps [{"tab1" {:aa 1}, "tab2" {:dd "bb"}, "tab3" {:qq 1}}
+                {"tab1" {:aa 2}, "tab2" {:dd "aa"}, "tab3" {:qq 2}}
+                {"tab1" {:aa 2}, "tab2" {:dd "gg"}, "tab3" {:qq 3}}]
+               (list "tab1" "tab2" "tab3"))
+  (squash-maps [{"tab1" {:aa 1}} {"tab1" {:aa 2}} {"tab1" {:aa 2}}]
+               (list "tab1")))
+
+(defn join-queries-with-fields
+  [query-structure fields-to-inject]
+  (if (empty? fields-to-inject)
+   query-structure
+   (reduce (fn [acc [k value]]
+            (cons (assoc k (first fields-to-inject) (join-queries-with-fields value (rest fields-to-inject))) acc ))
+    nil
+    query-structure) )
+  )
+
+(comment
+  (join-queries-with-fields '{{:aa 1} ({:dd "bb"}),
+                              {:aa 2} ({:dd "gg"} {:dd "aa"})}
+                            (list "tab1-items"))
+  (join-queries-with-fields '{{:aa 1} {{:dd "bb"} ({:qq 1})},
+                              {:aa 2} {{:dd "gg"} ({:qq 3}),
+                                       {:dd "aa"} ({:qq 2})}}
+                            (list "tab1-items" "tab2-items")))
+
+(defn empty-relation? [sql-result]
+  (some? (find-first (fn [[k val]] (and (-> k (name) (= "ID")) (nil? val))) sql-result) )
+  )
+
+(comment 
+  (empty-relation? {:WRITER/NAME "writer3",
+                              :WRITER/NOTE "Testowa notatka",
+                              :WRITER/ID 3,
+                              :POST/ID 3,
+                              :POST/AUTHOR 3,
+                              :POST/CONTENT "pierwszy post"})
+  (empty-relation? {:WRITER/NAME "writer3",
+                              :WRITER/NOTE "Testowa notatka",
+                              :WRITER/ID nil
+                              :POST/ID 3,
+                              :POST/AUTHOR 3,
+                              :POST/CONTENT "pierwszy post"})
+         )
+
+(defn create-nested-sql-result
+  [parsed-result tables relation-fields]
+  (let [uppercased-table-names (map str/upper-case tables)]
+    (as-> parsed-result it
+      ;; (remove empty-relation? it)
+      (map parse-multitable-sql-result it)
+      (squash-maps it uppercased-table-names)
+      (join-queries-with-fields it relation-fields))))
+
+(comment
+  (create-nested-sql-result [{:WRITER/NAME "writer3",
+                              :WRITER/NOTE "Testowa notatka",
+                              :WRITER/ID 3,
+                              :POST/ID 3,
+                              :POST/AUTHOR 3,
+                              :POST/CONTENT "pierwszy post"}
+                             {:WRITER/NAME "writer2",
+                              :WRITER/NOTE "notatka 123",
+                              :WRITER/ID 3,
+                              :POST/ID nil,
+                              :POST/AUTHOR nil,
+                              :POST/CONTENT nil}
+                             {:WRITER/NAME "writer1",
+                              :WRITER/NOTE "lorem ipsum",
+                              :WRITER/ID 3,
+                              :POST/ID 2,
+                              :POST/AUTHOR 3,
+                              :POST/CONTENT "drugi post"}]
+                            (list "Writer" "Post")
+                            (list "posts")))
+
+(comment
+  (sql-map->map #:USER{:ID "440b753d-1928-4007-bcd5-392ef5b3d0e7",
+                 :USERNAME "admin",
+                 :PASSWORD "haslo",
+                 :ROLE "admin",
+                 :EMAIL nil}))
