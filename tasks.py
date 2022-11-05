@@ -33,6 +33,9 @@ def lint(c, no_write=False):
 
     for ext in extension_to_lint:
         fpaths += list(pathlib.Path("./src").rglob(f"*.{ext}"))
+
+    
+    fpaths += list(pathlib.Path("./test").rglob(f"*.edn"))
     
     fpaths = [str(fpath) for fpath in fpaths]
 
