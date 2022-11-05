@@ -55,9 +55,10 @@
 (defn load-user-functionalities
   [app-data]
   (-> app-data
-      (update-in [:objects] #(conj % user/user-table user/token-table))
-      (update-in [:serializers]
-                 #(conj % user/user-admin-view user/user-regular-view))))
+      (update :objects (partial concat (list user/user-table user/token-table)))
+      (update :objects vec)
+      (update :serializers
+              #(conj % user/user-admin-view user/user-regular-view))))
 
 (comment
   #_{:clj-kondo/ignore [:unresolved-namespace]}
