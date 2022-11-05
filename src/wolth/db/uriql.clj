@@ -178,15 +178,14 @@
   (let [[l-joins r-joins] (reduce (fn [acc el]
                                     (if (left-join? el)
                                       (update acc 0 (fn [l] (conj l el)))
-                                      (update acc 1 (fn [l] (conj l el)))
-                                      ))
+                                      (update acc 1 (fn [l] (conj l el)))))
                             [[] []]
                             join-fields)]
     (cond-> query
       (not-empty l-joins) (assoc :left-join
                             (concatv (map join-map-to-clause l-joins)))
       (not-empty r-joins) (assoc :right-join
-                        (concatv (map join-map-to-clause r-joins))))))
+                            (concatv (map join-map-to-clause r-joins))))))
 
 (comment
   (hydrate-queries-with-joins
@@ -208,36 +207,6 @@
 (comment
   (join-queries (list test-select-query-1 test-select-query-2)
                 (list {:joint [:id :author]})))
-
-;; (defn- translate-string-fields-into-keywords
-;;   [sub-query]
-;;   (cond (and (vector? sub-query) (.contains [:and :or] (first sub-query)))
-;;           (mapv translate-string-fields-into-keywords sub-query)
-;;         (vector? sub-query) (update-in sub-query [1] keyword)
-;;         (keyword? sub-query) sub-query
-;;         :else (throw (RuntimeException.
-;;                        "Syntax error in filter query for serializers"))))
-
-;; (comment
-;;   (translate-string-fields-into-keywords [:= "owner" "Michał"])
-;;   (translate-string-fields-into-keywords
-;;     [:and [:or [:> "age" 100] [:= "owner" "Michał"]] [:= "name" "John"]]))
-
-
-;; (defn attach-optional-filter-query
-;;   [subquery filter-query]
-;;   (if filter-query
-;;     (update-in subquery [:where] (partial merge-where-clauses filter-query))
-;;     subquery))
-
-;; (comment
-;;   (attach-optional-filter-query {:where [:or [:= :role "regular"]
-;;                                          [:<> :surname "Kowalski"]]}
-;;                                 [:= "owner" "Michał"])
-;;   (attach-optional-filter-query {:where [:and [:= :role "regular"]
-;;                                          [:<> :surname "Kowalski"]]}
-;;                                 [:= "owner" "Michał"])
-;;   (attach-optional-filter-query {} [:= "owner" "Michał"]))
 
 
 (defn build-single-hsql-map
