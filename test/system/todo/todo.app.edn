@@ -1,0 +1,47 @@
+{:meta {:admin {:name "todoAdmin", :password "todo"}, :author "Monika Drozd"},
+ :objects [{:fields [{:name "title", :type :str128}],
+            :name "TodoList",
+            :relations [{:name "authorId",
+                         :references "User",
+                         :rel-type :o2m,
+                         :related-name-inside "author",
+                         :related-name-outside "lists"}]}
+           {:fields [{:constraints [:not-null], :name "finished", :type :bool}
+                     {:name "description", :type :str2048}
+                     {:constraints [:not-null], :name "name", :type :str128}
+                     {:name "creationDate", :type :date-tz}],
+            :name "TodoItem",
+            :relations [{:name "todoId",
+                         :references "TodoList",
+                         :related-name-inside "parent",
+                         :related-name-outside "tasks"}
+                        {:name "authorId",
+                         :references "User",
+                         :rel-type :o2m,
+                         :related-name-inside "author",
+                         :related-name-outside "todoTasks"}]}],
+ :persistent-db {:dbname "todoDatabase", :dbtype "h2"},
+ :serializers
+   [{:allowed-roles ["regular" "admin"],
+     :name "regular",
+     :operations
+       [{:create {:attached [["creationDate" :today-date] ["finished" false]
+                             ["authorId" :user-id]],
+                  :fields ["description" "name"]},
+         :delete {:additional-query "filter(\"author\"==<:user-id>)"},
+         :model "TodoItem",
+         :read
+           {:additional-query
+              "sortd(\"finished\")sorta(\"creationDate\")filter(\"author\"==<:user-id>)",
+            :fields ["id" "todoId" "finished" "description" "name"
+                     "creationDate"]},
+         :update {:additional-query "filter(\"author\"==<:user-id>)",
+                  :fields ["finished" "description" "name" "creationDate"]}}
+        {:create {:attached [["authorId" :user-id]], :fields ["title"]},
+         :delete {:additional-query "filter(\"authorId\"==<:user-id>)"},
+         :model "TodoList",
+         :read {:additional-query "filter(\"authorId\"==<:user-id>)",
+                :fields ["id" "title" "authorId"],
+                :model-fields ["tasks"]},
+         :update {:additional-query "filter(\"authorId\"==<:user-id>)",
+                  :fields ["title"]}}]}]}
