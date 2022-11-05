@@ -15,7 +15,8 @@
             [io.pedestal.http.body-params :as body-params]
             [wolth.server.resolvers :refer [wolth-resolver-interceptor]]
             [io.pedestal.http :as http]
-            [io.pedestal.http.route :as route]))
+            [io.pedestal.http.route :as route]
+            [wolth.db.user :as user]))
 
 (def methods-allowed-for-uriql #{:get :patch :delete})
 
@@ -224,7 +225,8 @@
 (defn- generate-common-utility-routes
   [app-name]
   (let [auth-uri (format "/%s/auth" app-name)
-        logout-uri (format "/%s/logout" app-name)]
+        logout-uri (format "/%s/logout" app-name)
+        my-user-info (format "/%s/whoami" app-name)]
     (list [auth-uri :post
            [(body-params/body-params) http/json-body utility-interceptor
             auth/token-auth-login-interceptor] :route-name
@@ -232,7 +234,11 @@
           [logout-uri :post
            [(body-params/body-params) http/json-body utility-interceptor
             auth/authenticator-interceptor auth/token-auth-logout-interceptor]
-           :route-name (keyword (str app-name "-token-logout-request"))])))
+           :route-name (keyword (str app-name "-token-logout-request"))]
+          [my-user-info :get
+           [(body-params/body-params) http/json-body utility-interceptor
+            auth/authenticator-interceptor user/my-user-info-interceptor]
+           :route-name (keyword (str app-name "user-info-request"))])))
 
 (defn generate-routes-for-app
   [app-name app-data]

@@ -12,11 +12,11 @@
 
 (def user-table
   {:name "User",
-   :fields [{:constraints [:not-null :unique], :name "username", :type :str128}
+   :fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+            {:constraints [:not-null :unique], :name "username", :type :str128}
             {:constraints [:not-null], :name "password", :type :password}
             {:constraints [:not-null], :name "role", :type :str128}
-            {:name "email", :type :str128}],
-   :options [:uuid-identifier]})
+            {:name "email", :type :str128}]})
 
 ; this table could be implemented fully in h2. Does not need any persistance /
 ; safety
@@ -35,7 +35,8 @@
 (def user-admin-view
   {:allowed-roles ["admin"],
    :name "user-admin",
-   :operations [{:create {:fields ["username" "password" "role" "email"]},
+   :operations [{:create {:fields ["username" "password" "role" "email"],
+                          :attached [["id" :random-uuid]]},
                  :update {:fields ["username" "password" "role" "email"]},
                  :read {:fields ["id" "username" "role" "email"]},
                  :model "User",
@@ -45,7 +46,7 @@
   {:allowed-roles true,
    :name "user-regular",
    :operations [{:create {:fields ["username" "password" "email"],
-                          :attached [["role" "regular"]]},
+                          :attached [["role" "regular"] ["id" :random-uuid]]},
                  :update {:fields ["username" "email" "password"],
                           :additional-query "filter(\"id\"<><:user-id>)"},
                  :model "User",
@@ -104,3 +105,13 @@
 (comment
   (_test-context '(user-token-exists? "token" "person"))
   (_test-context '(user-token-exists? "nie istnieje" "person")))
+
+(defn provide-user-information
+  [ctx]
+  (log/info ::provide-user-information (get ctx :logged-user))
+  (if-let [user-data (get ctx :logged-user)]
+    (assoc ctx :response {:status 200, :body user-data})
+    (assoc ctx :response {:status 204})))
+
+(def my-user-info-interceptor
+  {:name ::MY-USER-INFO-INTERCEPTOR, :enter provide-user-information})
