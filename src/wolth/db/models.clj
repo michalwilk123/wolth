@@ -4,24 +4,8 @@
             [honey.sql.helpers :as hsql]
             [wolth.utils.common :refer
              [field-lut translate-keys-to-vals constraints-lut cons-not-nil
-              vector-contains? compose]]))
+              find-first]]))
 
-
-
-(def sqlmap {:select [:a :b :c], :from [:foo], :where [:= :foo.a "baz"]})
-
-(def sqlmap2
-  {:select :*,
-   :from :person,
-   :where [:and [:> :person.age "10"] [:= :person.name "Adam"]]})
-
-(def depr-sqlmap3
-  {:create-table [:fruit :if-not-exists],
-   :with-columns [[:ID :int [:not nil] :auto-increment]
-                  [:name [:varchar 32] [:not nil]] [:cost :float :null]
-                  [:primary :key (keyword "(id)")]
-                  [:foreign :key (keyword "(id)") :references
-                   (keyword "Persons(jakiedID)")]]})
 
 (defn build-single-table-field
   [field]
@@ -35,9 +19,9 @@
     {:name "username", :type :uuid, :constraints [:not-null :unique]}))
 
 (defn expand-single-relation
-  [relation]
+  [parent-table-name relation]
   (let [ref-field (or (relation :ref) "id")
-        fk-name (format "fk_%s_%s" (relation :name) ref-field)
+        fk-name (format "fk_%s_%s" (relation :name) parent-table-name)
         constraints (cons-not-nil (if (= (relation :rel-type) :o2o) :unique nil)
                                   (relation :constraints))
         formatted-field (build-single-table-field
@@ -52,43 +36,28 @@
                   ref-field))))
 
 (comment
-  (expand-single-relation {:name "author",
+  (expand-single-relation "Post"
+                          {:name "author",
                            :references "Person",
                            :rel-type :o2m,
                            :constraints [:not-null],
                            :ref "username"})
   (expand-single-relation
+    "Post"
     {:name "author", :references "Person", :rel-type :o2o}))
 
 (defn generate-fk-fields
-  [relations]
+  [parent-table-name relations]
   (assert (or (coll? relations) (nil? relations))
           "Relations must build from the sequence or nil")
-  (map expand-single-relation relations))
+  (map (partial expand-single-relation parent-table-name) relations))
 
 (comment
-  (generate-fk-fields [{:name "author", :rel-type :o2m, :references "Person"}
+  (generate-fk-fields "Post"
+                      [{:name "author", :rel-type :o2m, :references "Person"}
                        {:name "owner", :rel-type :o2o, :references "Person"}])
-  (generate-fk-fields nil))
+  (generate-fk-fields "Post" nil))
 
-
-(defn create-id-field
-  [is-uuid & _kwargs]
-  (if is-uuid
-    {:name "id", :type :uuid, :constraints [:not-null :primary-key]}
-    {:name "id",
-     :type :int,
-     :constraints [:not-null :primary-key :auto-increment]}))
-
-
-(defn generate-optional-fields
-  [options]
-  (let [id-field (create-id-field (vector-contains? options :uuid-identifier))]
-    (map build-single-table-field (list id-field))))
-
-(comment
-  (generate-optional-fields [:uuid-identifier])
-  (generate-optional-fields []))
 
 (defn generate-create-table-fields
   [fields]
@@ -100,30 +69,30 @@
 
 (defn generate-create-table-query
   [object-data]
-  (let [additional-fields (generate-optional-fields (object-data :options))
-        regular-fields (generate-create-table-fields (object-data :fields))
-        fk-fields (generate-fk-fields (object-data :relations))]
+  (let [regular-fields (generate-create-table-fields (object-data :fields))
+        fk-fields (generate-fk-fields (object-data :name)
+                                      (object-data :relations))]
     (format "CREATE TABLE IF NOT EXISTS %s (%s);"
             (object-data :name)
-            (str/join ", "
-                      (flatten
-                        (list additional-fields regular-fields fk-fields))))))
+            (str/join ", " (flatten (list regular-fields fk-fields))))))
 
 (def _test-object-data-1
-  {:fields [{:name "name", :type :text}
+  {:fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+            {:name "name", :type :text}
             {:name "age", :type :int, :constraints [:not-null]}],
-   :name "Person",
-   :options [:uuid-identifier]})
+   :name "Person"})
 
 (def _test-object-data-2
-  {:fields [{:name "content", :type :text}],
+  {:fields [{:name "id", :type :id, :constraints [:id-constraints]}
+            {:name "content", :type :text}],
    :name "Post",
    :relations [{:name "author", :rel-type :o2m, :references "Person"}]})
 
 (def _test-object-data-3
   {:name "Worker",
-   :fields [{:name "first-name", :type :str128} {:name "email", :type :str128}],
-   :options [:uuid-identifier],
+   :fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+            {:name "id", :type :id, :constraints [:id-constraints]}
+            {:name "first-name", :type :str128} {:name "email", :type :str128}],
    :relations [{:name "supervisor", :rel-type :o2m, :references "Worker"}]})
 
 (def _test-objects (list (generate-create-table-query _test-object-data-2)))
@@ -135,23 +104,30 @@
 
 (defn cross-field-w-related-table
   [table field]
-  (letfn [(assign-correct-id-type [field]
-            (if (and (table :options)
-                     (vector-contains? (table :options) :uuid-identifier))
-              (assoc field :type :uuid)
-              (assoc field :type :int)))]
-    (if (= (field :references) (table :name))
-      (compose field assign-correct-id-type)
-      field)))
+  (update
+    field
+    :type
+    (fn [value]
+      (or
+        value
+        (when (= (field :references) (table :name))
+          (let
+            [id-field (find-first (fn [it] (= (it :name) "id")) (table :fields))
+             _ (assert
+                 (some? id-field)
+                 "The object that is the target of the relationship, MUST include the id field")]
+            (get id-field :type)))))))
 
 (comment
   (cross-field-w-related-table
-    {:fields [{:name "note", :type :str32}], :name "Person"}
+    {:fields [{:name "id", :type :id, :constraints [:id-constraints]}
+              {:name "note", :type :str32}],
+     :name "Person"}
     {:name "author", :rel-type :o2m, :references "Person"})
   (cross-field-w-related-table
-    {:fields [{:name "note", :type :str32}],
-     :name "Person",
-     :options [:uuid-identifier]}
+    {:fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+              {:name "note", :type :str32}],
+     :name "Person"}
     {:name "author", :rel-type :o2m, :references "Person"}))
 
 (defn cross-two-tables
@@ -171,7 +147,7 @@
   [tables]
   (assert (vector? tables)
           "function accept as an argument an list of table objects")
-  (map (fn [tab] (reduce cross-two-tables tab tables)) tables))
+  (for [table tables] (reduce cross-two-tables table tables)))
 
 
 (comment
@@ -180,7 +156,7 @@
 
 (defn generate-create-table-sql
   [objects-data]
-  (assert (or (seq? objects-data) (vector? objects-data)))
+  (assert (sequential? objects-data))
   (->> objects-data
        (cross-together-table-data)
        (map generate-create-table-query)
@@ -191,7 +167,5 @@
   (generate-create-table-sql [_test-object-data-1]))
 
 (comment
-  (sql/format sqlmap)
-  (sql/format depr-sqlmap3)
   (sql/format {:drop-table :foo})
   (hsql/create-table :foo :if-not-exists :with-columns [:id :int]))
