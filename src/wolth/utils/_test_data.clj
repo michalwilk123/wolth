@@ -23,15 +23,15 @@
                 :path "functions/clojureFunction.clj",
                 :type :clojure}],
    :meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
-   :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
-                       {:name "note", :type :text}],
-              :name "Person",
-              :options [:uuid-identifier]}
-             {:fields [{:name "content", :type :text}],
-              :name "Post",
-              :options [:uuid-identifier],
-              :relations
-                [{:name "author", :rel-type :o2m, :references "Person"}]}],
+   :objects
+     [{:fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+                {:constraints [:not-null], :name "name", :type :str32}
+                {:name "note", :type :text}],
+       :name "Person"}
+      {:fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+                {:name "content", :type :text}],
+       :name "Post",
+       :relations [{:name "author", :rel-type :o2m, :references "Person"}]}],
    :persistent-db {:dbname "mydatabase", :dbtype "h2"},
    :serializers [{:allowed-roles ["public"],
                   :name "public",
@@ -116,11 +116,11 @@
   {:objects
      [{:name "User",
        :fields
-         [{:constraints [:not-null :unique], :name "username", :type :str128}
+         [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+          {:constraints [:not-null :unique], :name "username", :type :str128}
           {:constraints [:not-null], :name "password", :type :password}
           {:constraints [:not-null], :name "role", :type :str128}
-          {:constraints [:unique], :name "email", :type :str128}],
-       :options [:uuid-identifier]}],
+          {:constraints [:unique], :name "email", :type :str128}]}],
    :functions
      [{:allowed-roles ["admin"], :function-name "datefunc", :name "getDate"}],
    :serializers [{:name "public",

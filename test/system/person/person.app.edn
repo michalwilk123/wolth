@@ -8,8 +8,7 @@
  :meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
  :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
                      {:name "note", :type :text}],
-            :name "Writer",
-            }
+            :name "Writer"}
            {:fields [{:name "content", :type :text}],
             :name "Post",
             :relations [{:name "author",
@@ -25,14 +24,12 @@
                      {:attached [["note" "Testowa notatka"]], :fields ["name"]},
                    :delete true,
                    :model "Writer",
-                   :read { :additional-query "sorta(\"name\")",
-                          :fields ["name" "note" "id"]
+                   :read {:additional-query "sorta(\"name\")",
+                          :fields ["name" "note" "id"],
                           :model-fields ["posts"]},
                    :update {:fields ["name"]}}
-                   {:model "Post"
-                    :create {:fields ["author" "content" ]}
-                    :read {:fields ["author" "content" "id"]}
-                    :update true
-                    :delete true
-                    }
-                  ]}]}
+                  {:create {:fields ["author" "content"]},
+                   :delete true,
+                   :model "Post",
+                   :read {:fields ["author" "content" "id"]},
+                   :update true}]}]}

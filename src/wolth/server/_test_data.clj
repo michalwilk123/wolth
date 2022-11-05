@@ -6,17 +6,17 @@
 
 (def _server_test_app_data
   {:objects
-     [{:fields [{:constraints [:not-null], :name "name", :type :str32}
+     [{:fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+                {:constraints [:not-null], :name "name", :type :str32}
                 {:name "note", :type :text}],
-       :name "Person",
-       :options [:uuid-identifier]}
+       :name "Person"}
       {:name "User",
        :fields
-         [{:constraints [:not-null :unique], :name "username", :type :str128}
+         [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+          {:constraints [:not-null :unique], :name "username", :type :str128}
           {:constraints [:not-null], :name "password", :type :password}
           {:constraints [:not-null], :name "role", :type :str128}
-          {:constraints [:unique], :name "email", :type :str128}],
-       :options [:uuid-identifier]}],
+          {:constraints [:unique], :name "email", :type :str128}]}],
    :functions [{:name "getDate"}],
    :serializers [{:name "public",
                   :allowed-roles ["admin"],
@@ -44,21 +44,23 @@
 (def _test-object-spec
   '({:name "User",
      :fields
-       [{:constraints [:not-null :unique], :name "username", :type :str128}
+       [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+        {:constraints [:not-null :unique], :name "username", :type :str128}
         {:constraints [:not-null], :name "password", :type :password}
         {:constraints [:not-null], :name "role", :type :str128}
-        {:constraints [:unique], :name "email", :type :str128}],
-     :options [:uuid-identifier]}))
+        {:constraints [:unique], :name "email", :type :str128}]}))
 
 (def _test-object-spec-with-relations-1
   {:name "Country",
-   :fields [{:constraints [:not-null], :name "countryName", :type :str128}
+   :fields [{:name "id", :type :id, :constraints [:id-constraints]}
+            {:constraints [:not-null], :name "countryName", :type :str128}
             {:constraints [:unique], :name "code", :type :int}
             {:constraints [:unique], :name "president", :type :str128}]})
 
 (def _test-object-spec-with-relations-2
   {:name "City",
-   :fields [{:constraints [:not-null], :name "cityName", :type :str128}
+   :fields [{:name "id", :type :id, :constraints [:id-constraints]}
+            {:constraints [:not-null], :name "cityName", :type :str128}
             {:constraints [], :name "creationData", :type :str128}
             {:constraints [], :name "major", :type :str128}],
    :relations [{:name "country_id",
@@ -117,11 +119,11 @@
   {:objects
      [{:name "User",
        :fields
-         [{:constraints [:not-null :unique], :name "username", :type :str128}
+         [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+          {:constraints [:not-null :unique], :name "username", :type :str128}
           {:constraints [:not-null], :name "password", :type :password}
           {:constraints [:not-null], :name "role", :type :str128}
-          {:constraints [:unique], :name "email", :type :str128}],
-       :options [:uuid-identifier]}],
+          {:constraints [:unique], :name "email", :type :str128}]}],
    :functions [{:allowed-roles ["admin"],
                 :function-name "datefunc",
                 :name "getDate",
@@ -204,11 +206,13 @@
 (def _test-app-data-w-relations
   {:objects
      [{:name "Country",
-       :fields [{:constraints [:not-null], :name "countryName", :type :str128}
+       :fields [{:name "id", :type :id, :constraints [:id-constraints]}
+                {:constraints [:not-null], :name "countryName", :type :str128}
                 {:constraints [:unique], :name "code", :type :int}
                 {:constraints [:unique], :name "president", :type :str128}]}
       {:name "City",
-       :fields [{:constraints [:not-null], :name "cityName", :type :str128}
+       :fields [{:name "id", :type :id, :constraints [:id-constraints]}
+                {:constraints [:not-null], :name "cityName", :type :str128}
                 {:constraints [], :name "creationData", :type :str128}
                 {:constraints [], :name "major", :type :str128}],
        :relations [{:name "country_id",
