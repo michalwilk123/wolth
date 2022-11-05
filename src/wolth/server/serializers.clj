@@ -7,9 +7,8 @@
     [wolth.server.-test-data :refer
      [_serializers_test_app_data _test-object-spec
       _test-object-spec-with-relations-1 _test-object-spec-with-relations-2
-      _test-normalized-fields _test-json-body _test-bank-request-map
-      _test-app-data-w-relations _test-post-request-map _test-get-request-map
-      _test-patch-request-map _test-delete-request-map]]
+      _test-json-body _test-bank-request-map _test-post-request-map
+      _test-get-request-map _test-patch-request-map _test-delete-request-map]]
     [wolth.server.bank :as bank-utils]
     [wolth.db.uriql :refer [merge-hsql-queries build-single-hsql-map]]
     [wolth.server.config :refer [def-context app-data-container]]
@@ -17,95 +16,6 @@
 
 (def-context _test-context
              {app-data-container {"test-app" _serializers_test_app_data}})
-
-(defn- normalize-field
-  [verbose-field]
-  (let [[new-type new-value] (fields/normalize-field (verbose-field :type)
-                                                     (verbose-field :data))]
-    (merge verbose-field {:type new-type, :data new-value})))
-
-
-(comment
-  (normalize-field {:constraints [:not-null :unique],
-                    :name "haslo",
-                    :type :password,
-                    :data "admin"})
-  (normalize-field
-    {:constraints [:not-null :unique], :name "id", :type :uuid, :data nil}))
-
-(defn- attatch-field-to-object
-  [object-data field]
-  (let [object-fields (concat (get object-data :relations)
-                              (object-data :fields))
-        [key value] field
-        related-table (utils/find-first #(= (% :name) (name key))
-                                        object-fields)]
-    (if (nil? related-table) nil (assoc related-table :data value))))
-
-(comment
-  (attatch-field-to-object (first _test-object-spec) [:username "Mariusz"])
-  (attatch-field-to-object (second (_test-app-data-w-relations :objects))
-                           [:country_id 123])
-  (attatch-field-to-object (first _test-object-spec) [:unknownfield 123]))
-
-
-
-(defn- validate-field-by-serializer
-  "this is a place to implement custom validation rules"
-  [verbose-field]
-  verbose-field)
-
-(defn- verbose-field->terse-repr
-  [verbose-field]
-  (vector (keyword (verbose-field :name)) (verbose-field :data)))
-
-(comment
-  (verbose-field->terse-repr {:constraints [:not-null :unique],
-                              :name "id",
-                              :type :str128,
-                              :data "9cf2fae5-8891-4379-a159-5124e2ec6db7"}))
-
-(defn- normalize-field-associeted-w-object
-  [params -object-data & {:keys [insert-id], :or {insert-id false}}]
-  (let [object-data (first -object-data)]
-    (letfn
-      [(attatch-optional-uuid-field [verbose-params]
-         (if (and insert-id
-                  (utils/vector-contains? (object-data :options)
-                                          :uuid-identifier))
-           (cons {:constraints [:not-null :unique], :name "id", :type :uuid}
-                 verbose-params)
-           verbose-params))
-       (all-fields-found-check [v-fields]
-         (if-not (every? some? v-fields)
-           (throw-wolth-exception :400
-                                  (str "Could not populate all fields: "
-                                       (vec v-fields)))
-           v-fields))]
-      (->> params
-           (map (partial attatch-field-to-object object-data))
-           (all-fields-found-check)
-           (attatch-optional-uuid-field)
-           (map validate-field-by-serializer)
-           (map normalize-field)
-           (map verbose-field->terse-repr)
-           (into {})))))
-
-(comment
-  (normalize-field-associeted-w-object {:username "Mariusz",
-                                        :password "haslo",
-                                        :email "mariusz@gmail.com",
-                                        :role "regular"}
-                                       _test-object-spec
-                                       :insert-id
-                                       true))
-
-(defn- fields->insert-sql
-  [table fields]
-  (sql/format {:insert-into [(keyword table)], :values [fields]}))
-
-(comment
-  (fields->insert-sql "User" _test-normalized-fields))
 
 (defn- serialize-post
   [params serializer-specs object-specs]
@@ -118,19 +28,18 @@
         processed-fields (as-> params it
                            (select-keys it (map keyword fields))
                            (utils/assoc-vector it attatched))]
-    (if-let [normalized-fields (normalize-field-associeted-w-object
+    (if-let [normalized-fields (fields/normalize-field-associeted-w-object
                                  processed-fields
-                                 object-specs
-                                 :insert-id
-                                 true)]
+                                 object-specs)]
       (-> (build-single-hsql-map :insert table-name nil normalized-fields)
           (sql/format))
       (throw-wolth-exception :400))))
 
 (comment
   (serialize-post _test-json-body
-                  (list {:fields ["username" "email" "password"],
-                         :attached [["role" "regular"]]})
+                  (list {:fields ["id" "username" "email" "password"],
+                         :attached [["role" "regular"] ["username" :user-name]
+                                    ["id" :random-uuid]]})
                   _test-object-spec))
 
 (defn- serialize-get
@@ -152,7 +61,8 @@
            serializer-fields)
          (merge-hsql-queries :select relations-data)
          (sql/format)
-         (assoc {:relation-fields (map :field-to-inject relations-data) :table-names object-names}
+         (assoc {:relation-fields (map :field-to-inject relations-data),
+                 :table-names object-names}
            :sql-query))))
 
 (comment
@@ -193,7 +103,7 @@
                 (map str
                   (map server-utils/sanitize-uriql-query (vals path-params))
                   additional-subqueries))]
-    (if-let [normalized-fields (normalize-field-associeted-w-object
+    (if-let [normalized-fields (fields/normalize-field-associeted-w-object
                                  processed-fields
                                  object-specs)]
       (-> (build-single-hsql-map :update object-names query normalized-fields)
