@@ -38,6 +38,9 @@
 
 (defn stop-server [] (http/stop @server-instance))
 
+(def _test-application-path "test/system/person/person.app.edn")
+(def _todo-application-path "test/system/todo/todo.app.edn")
+
 (defn configure-wolth
   [& app-paths]
   (run! test-application-file! app-paths)
@@ -54,10 +57,16 @@
     (reset! wolth-routes generated-routes)
     nil))
 
-(def _test-application-path "test/system/person/person.app.edn")
-
 (comment
-  (configure-wolth _test-application-path))
+  ;; (configure-wolth _test-application-path)
+  (configure-wolth _todo-application-path))
+
+
+(defn init-server
+  [& app-paths]
+  (configure-wolth app-paths)
+  (create-server)
+  (start-server))
 
 (defn -main [& app-paths] (configure-wolth app-paths))
 
