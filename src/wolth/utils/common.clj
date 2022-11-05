@@ -11,21 +11,25 @@
    :str32 "VARCHAR(32)",
    :str128 "VARCHAR(128)",
    :str256 "VARCHAR(256)",
+   :str2048 "VARCHAR(2048)",
    :uuid "VARCHAR(48)",
    :password "VARCHAR(128)",
    :bool "BOOLEAN",
    :text "TEXT",
    :int "INTEGER",
+   :id "INTEGER",
    :float "FLOAT",
    :double "DOUBLE",
-   :date "TIMESTAMPZ"})
+   :date-tz "TIMESTAMP WITH TIME ZONE"})
 
 (def constraints-lut
   {:not-null "NOT NULL",
    :unique "UNIQUE",
    :primary-key "PRIMARY KEY",
    :identity "IDENTITY",
-   :auto-increment "AUTO_INCREMENT"})
+   :auto-increment "AUTO_INCREMENT",
+   :id-constraints "NOT NULL PRIMARY KEY AUTO_INCREMENT",
+   :uuid-constraints "NOT NULL PRIMARY KEY "})
 
 ; USE H2 is experimental feature (not implemented yet)
 (def available-table-options [:uuid-identifier :use-h2])
@@ -289,12 +293,15 @@
 (defn join-queries-with-fields
   [query-structure fields-to-inject]
   (if (empty? fields-to-inject)
-   query-structure
-   (reduce (fn [acc [k value]]
-            (cons (assoc k (first fields-to-inject) (join-queries-with-fields value (rest fields-to-inject))) acc ))
-    nil
-    query-structure) )
-  )
+    query-structure
+    (reduce (fn [acc [k value]]
+              (cons (assoc k
+                      (first fields-to-inject) (join-queries-with-fields
+                                                 value
+                                                 (rest fields-to-inject)))
+                    acc))
+      nil
+      query-structure)))
 
 (comment
   (join-queries-with-fields '{{:aa 1} ({:dd "bb"}),
@@ -305,24 +312,28 @@
                                        {:dd "aa"} ({:qq 2})}}
                             (list "tab1-items" "tab2-items")))
 
-(defn empty-relation? [sql-result]
-  (some? (find-first (fn [[k val]] (and (-> k (name) (= "ID")) (nil? val))) sql-result) )
-  )
+;; (defn empty-relation?
+;;   [sql-result]
+;;   (some? (find-first (fn [[k val]]
+;;                        (and (-> k
+;;                                 (name)
+;;                                 (= "ID"))
+;;                             (nil? val)))
+;;                      sql-result)))
 
-(comment 
-  (empty-relation? {:WRITER/NAME "writer3",
-                              :WRITER/NOTE "Testowa notatka",
-                              :WRITER/ID 3,
-                              :POST/ID 3,
-                              :POST/AUTHOR 3,
-                              :POST/CONTENT "pierwszy post"})
-  (empty-relation? {:WRITER/NAME "writer3",
-                              :WRITER/NOTE "Testowa notatka",
-                              :WRITER/ID nil
-                              :POST/ID 3,
-                              :POST/AUTHOR 3,
-                              :POST/CONTENT "pierwszy post"})
-         )
+;; (comment
+;;   (empty-relation? {:WRITER/NAME "writer3",
+;;                     :WRITER/NOTE "Testowa notatka",
+;;                     :WRITER/ID 3,
+;;                     :POST/ID 3,
+;;                     :POST/AUTHOR 3,
+;;                     :POST/CONTENT "pierwszy post"})
+;;   (empty-relation? {:WRITER/NAME "writer3",
+;;                     :WRITER/NOTE "Testowa notatka",
+;;                     :WRITER/ID nil,
+;;                     :POST/ID 3,
+;;                     :POST/AUTHOR 3,
+;;                     :POST/CONTENT "pierwszy post"}))
 
 (defn create-nested-sql-result
   [parsed-result tables relation-fields]
