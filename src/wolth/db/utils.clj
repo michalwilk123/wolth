@@ -19,3 +19,10 @@
 (defn execute-sql-expr!
   [app-name sql-expr]
   (execute! (get-datasource-from-memory app-name) sql-expr))
+
+(comment
+  (execute-sql-expr! "person"
+                     ["SELECT name, note, id FROM Writer ORDER BY name ASC"])
+  (execute-sql-expr!
+    "person"
+    ["SELECT T1.name, T1.note, T1.id, T2.author, T2.content FROM Writer AS T1 LEFT JOIN Post AS T2 ON T1.id = T2.author ORDER BY T1.name ASC"]))

@@ -1,7 +1,8 @@
 (ns wolth.utils.common
   (:require [clojure.string :as str]
             [wolth.db.utils :refer [execute-sql-expr!]]
-            [io.pedestal.log :as log]))
+            [io.pedestal.log :as log])
+  (:import [java.util UUID]))
 
 
 (def field-lut
@@ -372,3 +373,11 @@
                  :PASSWORD "haslo",
                  :ROLE "admin",
                  :EMAIL nil}))
+
+(defn create-uuid [& _] (.toString (UUID/randomUUID)))
+(defn today-date [& _] (java.time.LocalDateTime/now))
+(defn get-user-id [ctx] (get-in ctx [:logged-user :id]))
+(defn get-user-name [ctx] (get-in ctx [:logged-user :username]))
+
+(comment
+  (create-uuid))

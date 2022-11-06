@@ -7,8 +7,7 @@
             [next.jdbc :refer [get-datasource]]
             [wolth.db.models :refer [generate-create-table-sql]]
             [wolth.utils.crypto :refer [create-password-hash]]
-            [wolth.db.fields :refer [create-uuid]]
-            [wolth.utils.common :refer [rand-string multiple-get]]
+            [wolth.utils.common :refer [rand-string multiple-get create-uuid]]
             [wolth.utils.-test-data :refer
              [_test_application_path _loader_test_app_data]]
             [wolth.server.config :refer
