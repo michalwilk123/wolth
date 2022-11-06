@@ -31,24 +31,30 @@
 ; =============== TEST DATA FOR utils.clj ================ END
 
 ; =============== TEST DATA FOR serializers.clj ================ START
+(def _test-admin-serializer-spec
+  [{:model "User", :read true, :update true, :create true, :delete true}])
+
 (def _test-serializer-spec
   {:name "public",
    :allowed-roles true,
    :operations [{:model "User",
-                 :read {:fields ["email" "username" "id"], :attached []},
-                 :update {:fields ["username" "email"]},
+                 :read {:fields ["email" "username" "id"],
+                        :additional-query "filter(\"id\"==<:user-id>)"},
+                 :update {:fields ["username" "email"],
+                          :attached [["lastModified" :today-date]]},
                  :create {:fields ["username" "email" "password"],
-                          :attached [["role" "regular"]]},
+                          :attached [["role" "regular"]
+                                     ["lastModified" :today-date]]},
                  :delete true}]})
 
 (def _test-object-spec
-  '({:name "User",
-     :fields
-       [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
-        {:constraints [:not-null :unique], :name "username", :type :str128}
-        {:constraints [:not-null], :name "password", :type :password}
-        {:constraints [:not-null], :name "role", :type :str128}
-        {:constraints [:unique], :name "email", :type :str128}]}))
+  {:name "User",
+   :fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
+            {:constraints [:not-null :unique], :name "username", :type :str128}
+            {:constraints [:not-null], :name "password", :type :password}
+            {:constraints [:not-null], :name "role", :type :str128}
+            {:name "lastModified", :type :date-tz}
+            {:constraints [:unique], :name "email", :type :str128}]})
 
 (def _test-object-spec-with-relations-1
   {:name "Country",
@@ -88,7 +94,7 @@
              :request-method :post}})
 
 (def _test-get-request-map
-  {:logged-user {:username "Przemek", :id 22222},
+  {:logged-user {:username "Przemek", :id 22211},
    :request {:json-params {},
              :uri "/test-app/User/*/public",
              :path-params {:User-query "*"},
@@ -223,14 +229,16 @@
    :serializers
      [{:name "regular-view",
        :allowed-roles ["regular"],
-       :operations [{:model "Country",
-                     :delete true,
-                     :read {:fields ["countryName" "code" "president" "cities"],
-                            :additional-query "filter(\"code\"<>'11111')",
-                            :model-fields ["cities"]}}
-                    {:model "City",
-                     :read {:fields ["cityName" "major"],
-                            :additional-query "filter(\"major\"<>'Adam West')",
-                            :model-fields ["country"]}}]}]})
+       :operations
+         [{:model "Country",
+           :delete true,
+           :read {:fields ["countryName" "code" "president" "cities"],
+                  :additional-query "filter(\"code\"<>'11111')",
+                  :model-fields ["cities"]}}
+          {:model "City",
+           :read {:fields ["cityName" "major"],
+                  :additional-query
+                    "filter(\"major\"<>'Adam West'and\"author\"==<:user-id>)",
+                  :model-fields ["country"]}}]}]})
 
 ; =============== TEST DATA FOR routes.clj ================ END

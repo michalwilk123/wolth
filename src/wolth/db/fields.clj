@@ -3,28 +3,21 @@
             [clojure.string :as str]
             [honey.sql :as sql]
             [wolth.server.exceptions :refer [throw-wolth-exception]]
-            [wolth.utils.common :refer [trim-string find-first]]
+            [wolth.utils.common :as common]
             [wolth.server.-test-data :refer
              [_test-normalized-fields _test-object-spec
-              _test-app-data-w-relations]]
-            [wolth.db.fields :as fields])
-  (:import [java.util UUID]))
-
-(defn create-uuid [& _] (.toString (UUID/randomUUID)))
-(defn today-date [& _] (java.time.LocalDateTime/now))
-(defn get-user-id [ctx] (get-in ctx [:logged-user :id]))
-(defn get-user-name [ctx] (get-in ctx [:logged-user :username]))
-
-(comment
-  (create-uuid))
+              _test-admin-serializer-spec _test-app-data-w-relations
+              _test-serializer-spec]]
+            [wolth.db.fields :as fields]
+            [io.pedestal.http.body-params :as body-params]))
 
 (def ^:private key-normalization-lut {:password [:str128 create-password-hash]})
 
 (def ^:private value-normalization-lut
-  {:random-uuid create-uuid,
-   :today-date today-date,
-   :user-id get-user-id,
-   :user-username get-user-name})
+  {:random-uuid common/create-uuid,
+   :today-date common/today-date,
+   :user-id common/get-user-id,
+   :user-username common/get-user-name})
 
 (defn normalize-value-field
   [ctx value]
@@ -66,7 +59,7 @@
               [(re-pattern val)
                (as-> val it
                  (str it)
-                 (trim-string it :start 2)
+                 (common/trim-string it :start 2)
                  (keyword it)
                  (value-normalization-lut it)
                  (it ctx)
@@ -127,14 +120,15 @@
   (let [object-fields (concat (get object-data :relations)
                               (object-data :fields))
         [key value] field
-        related-table (find-first #(= (% :name) (name key)) object-fields)]
+        related-table (common/find-first #(= (% :name) (name key))
+                                         object-fields)]
     (if (nil? related-table) nil (assoc related-table :data value))))
 
 (comment
-  (attatch-field-to-object (first _test-object-spec) [:username "Mariusz"])
+  (attatch-field-to-object _test-object-spec [:username "Mariusz"])
   (attatch-field-to-object (second (_test-app-data-w-relations :objects))
                            [:country_id 123])
-  (attatch-field-to-object (first _test-object-spec) [:unknownfield 123]))
+  (attatch-field-to-object _test-object-spec [:unknownfield 123]))
 
 
 
@@ -153,39 +147,38 @@
                               :type :str128,
                               :data "9cf2fae5-8891-4379-a159-5124e2ec6db7"}))
 
-(defn normalize-field-associeted-w-object
-  [ctx params -object-data]
-  (let [object-data (first -object-data)]
-    (letfn [(all-fields-found-check [v-fields]
-              (if-not (every? some? v-fields)
-                (throw-wolth-exception :400
-                                       (str "Could not populate all fields: "
-                                            (vec v-fields)))
-                v-fields))]
-      (->> params
-           (map (partial attatch-field-to-object object-data))
-           (all-fields-found-check)
-           (map validate-field-by-serializer)
-           (map (partial normalize-field ctx))
-           (map verbose-field->terse-repr)
-           (into {})))))
+(defn associate-fields-w-object
+  [ctx params object-data]
+  (letfn [(all-fields-found-check [v-fields]
+            (if-not (every? some? v-fields)
+              (throw-wolth-exception :400
+                                     (str "Could not populate all fields: "
+                                          (vec v-fields)))
+              v-fields))]
+    (->> params
+         (map (partial attatch-field-to-object object-data))
+         (all-fields-found-check)
+         (map validate-field-by-serializer)
+         (map (partial normalize-field ctx))
+         (map verbose-field->terse-repr)
+         (into {}))))
 
 (comment
-  (normalize-field-associeted-w-object
-    {:logged-user {:id 123, :username "lalala"}}
-    {:id :random-uuid,
-     :username :user-username,
-     :password "haslo",
-     :email "mariusz@gmail.com",
-     :role "regular"}
-    _test-object-spec)
-  (normalize-field-associeted-w-object {}
-                                       {:id :random-uuid,
-                                        :username "Mariusz",
-                                        :password "haslo",
-                                        :email "mariusz@gmail.com",
-                                        :role "regular"}
-                                       _test-object-spec))
+  (associate-fields-w-object {:logged-user {:id 123, :username "lalala"}}
+                             {:id :random-uuid,
+                              :username :user-username,
+                              :password "haslo",
+                              :email "mariusz@gmail.com",
+                              :role "regular"}
+                             _test-object-spec)
+  (associate-fields-w-object {}
+                             {:id :random-uuid,
+                              :username "Mariusz",
+                              :password "haslo",
+                              :email "mariusz@gmail.com",
+                              :role "regular"}
+                             _test-object-spec))
+
 
 (defn- fields->insert-sql
   [table fields]
@@ -193,6 +186,53 @@
 
 (comment
   (fields->insert-sql "User" _test-normalized-fields))
+
+(defn normalize-attatched-field
+  [ctx field]
+  (if (-> field
+          (second)
+          (keyword?))
+    (if-let [norm-fn (value-normalization-lut (second field))]
+      (assoc field 1 (norm-fn ctx))
+      (throw-wolth-exception :500
+                             (str "Tried to call unknown function: "
+                                  (second field))))
+    field))
+
+(comment
+  (normalize-attatched-field {} ["name" "Michał"])
+  (normalize-attatched-field {:logged-user {:id 112, :username "aaa"}}
+                             ["id" :user-id])
+  (normalize-attatched-field {} ["id" :random-uuid])
+  (normalize-attatched-field {} ["createdAt" :today-date])
+  (normalize-attatched-field {} ["createdAt" :unknown-function]))
+
+
+(defn normalize-body-parameters
+  [ctx object-data serializer-operation body-params]
+  (if (true? serializer-operation)
+    body-params
+    (let [attached-fields (get serializer-operation :attached)
+          attached-fields (map (partial normalize-attatched-field ctx)
+                            attached-fields)
+          selected-fields (as-> serializer-operation it
+                            (get it :fields)
+                            (map keyword it)
+                            (select-keys body-params it)
+                            (common/assoc-vector it attached-fields))]
+      (associate-fields-w-object ctx selected-fields object-data))))
+
+(comment
+  (normalize-body-parameters
+    {:logged-user {:id 111}}
+    _test-object-spec
+    (get-in _test-serializer-spec [:operations 0 :create])
+    {:aa 111, :password "lalala", :email "lalala@lala.la", :username "lala"})
+  (normalize-body-parameters
+    {}
+    _test-object-spec
+    true
+    {:password "lalala", :email "lalala@lala.la", :username "lala"}))
 
 ;; (defn normalize-attached-fields
 ;;   [ctx fields]
@@ -216,3 +256,12 @@
       ;;      verbose-params))
   ;; (let [normalization-fn (partial normalize-attached-fields ctx)]
         ;; (serializer-spec :attached) (update :attached normalization-fn)
+
+        ;; fields (:fields (first serializer-specs))
+        ;; attatched (:attached (first serializer-specs))
+        ;; processed-fields (as-> params it
+        ;;                    (select-keys it (map keyword fields))
+        ;;                    (utils/assoc-vector it attatched))
+             ;;  (fields/normalize-field-associeted-w-object
+             ;;                      processed-fields
+             ;;                      object-specs)
