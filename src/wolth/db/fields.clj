@@ -6,10 +6,8 @@
             [wolth.utils.common :as common]
             [wolth.server.-test-data :refer
              [_test-normalized-fields _test-object-spec
-              _test-admin-serializer-spec _test-app-data-w-relations
-              _test-serializer-spec]]
-            [wolth.db.fields :as fields]
-            ))
+              _test-app-data-w-relations _test-serializer-spec]]
+            [wolth.db.fields :as fields]))
 
 (def ^:private key-normalization-lut {:password [:str128 create-password-hash]})
 
@@ -233,35 +231,3 @@
     _test-object-spec
     true
     {:password "lalala", :email "lalala@lala.la", :username "lala"}))
-
-;; (defn normalize-attached-fields
-;;   [ctx fields]
-;;   (mapv (fn [field]
-;;           (if (and (keyword field) (get serializer-normalization-lut field))
-;;             ((get serializer-normalization-lut field) ctx)
-;;             field))
-;;     fields))
-
-;; (comment
-;;   (normalize-attached-fields {:logged-user {:id 112}} [ [:= "author"
-;;   :user-id] ["lalal" "aaaa"] ["num" 123] ["qqqq" :user-username]]))
-
-           ;; (attatch-optional-uuid-field)
-      ;; [(attatch-optional-uuid-field [verbose-params]
-      ;;    (if (and insert-id
-      ;;             (utils/vector-contains? (object-data :options)
-      ;;                                     :uuid-identifier))
-      ;;      (cons {:constraints [:not-null :unique], :name "id", :type :uuid}
-      ;;            verbose-params)
-      ;;      verbose-params))
-  ;; (let [normalization-fn (partial normalize-attached-fields ctx)]
-        ;; (serializer-spec :attached) (update :attached normalization-fn)
-
-        ;; fields (:fields (first serializer-specs))
-        ;; attatched (:attached (first serializer-specs))
-        ;; processed-fields (as-> params it
-        ;;                    (select-keys it (map keyword fields))
-        ;;                    (utils/assoc-vector it attatched))
-             ;;  (fields/normalize-field-associeted-w-object
-             ;;                      processed-fields
-             ;;                      object-specs)

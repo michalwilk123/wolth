@@ -32,12 +32,6 @@
                            {:Country-query "filter(\"countryName\"=='Poland')",
                             :City-query "filter(\"cityName\"<>'Gdansk')"}))
 
-;; additional-subqueries (map :additional-query serializer-specs)
-;; query (first
-;;         (map str
-;;           (map server-utils/sanitize-uriql-query (vals path-params))
-;;           additional-subqueries))
-
 
 (defn normalize-additional-query
   [ctx operation]

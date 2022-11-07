@@ -22,29 +22,12 @@
   [body-params object-specs]
   (assert (map? body-params))
   (assert (map? object-specs))
-  (let [table-name (:name object-specs)
-        ;; fields (:fields (first serializer-specs))
-        ;; attatched (:attached (first serializer-specs))
-        ;; processed-fields (as-> params it
-        ;;                    (select-keys it (map keyword fields))
-        ;;                    (utils/assoc-vector it attatched))
-       ]
+  (let [table-name (:name object-specs)]
     (-> (build-single-hsql-map :insert table-name nil body-params)
-        (sql/format))
-    ;; (if-let [ ; normalized-fields (assert false)
-    ;;          ;;  (fields/normalize-field-associeted-w-object
-    ;;          ;;                      processed-fields
-    ;;          ;;                      object-specs)
-    ;;         ]
-    ;;   (throw-wolth-exception :400))
-  ))
+        (sql/format))))
 
 (comment
   (serialize-post {:password "dmsandkjsanjkdsbnakh", :name "lalalala"}
-                  ;; (list {:fields ["id" "username" "email" "password"],
-                  ;;        :attached [["role" "regular"] ["username"
-                  ;;        :user-name]
-                  ;;                   ["id" :random-uuid]]})
                   _test-object-spec))
 
 (defn- serialize-get
@@ -52,17 +35,9 @@
   (assert (sequential? queries))
   (let [serializer-fields (map #(map keyword (% :fields)) serializer-specs)
         model-fields (map :model-fields serializer-specs)
-        ;; additional-subqueries (map :additional-query serializer-specs)
         object-names (map #(get % :name) objects-data)
-        ;; ordered-path-params (server-utils/get-query-urls-in-order
-        ;; object-names
-        ;;                                                           path-params)
         relations-data (server-utils/get-serialized-relation-data model-fields
-                                                                  objects-data)
-        ;; queries (map str
-        ;;           (map server-utils/sanitize-uriql-query ordered-path-params)
-        ;;           additional-subqueries)
-       ]
+                                                                  objects-data)]
     (->> (map (partial build-single-hsql-map :select)
            object-names
            queries
@@ -96,34 +71,16 @@
   [uriql-query body-params object-data]
   (assert (map? body-params))
   (assert (map? object-data))
-  (let [object-names (object-data :name)
-        ;; fields (:fields (first serializer-specs))
-        ;; attatched (:attatched (first serializer-specs))
-        ;; additional-subqueries (map :additional-query serializer-specs)
-        ;; processed-fields (as-> body-params it
-        ;;                    (select-keys it (map keyword fields))
-        ;;                    (utils/assoc-vector it attatched))
-        ;; query (first
-        ;;         (map str
-        ;;           (map server-utils/sanitize-uriql-query (vals path-params))
-        ;;           additional-subqueries))
-       ]
+  (let [object-names (object-data :name)]
     (-> (build-single-hsql-map :update object-names uriql-query body-params)
-        (sql/format))
-    ;; (if-let [;; normalized-fields nil
-    ;;          ;;  (fields/normalize-field-associeted-w-object
-    ;;          ;;                      processed-fields
-    ;;          ;;                      object-specs)
-    ;;         ]
-    ;;   (throw-wolth-exception :400))
-  ))
-
+        (sql/format))))
 
 (comment
   (serialize-patch "filter(\"username\"=='michal')"
                    {:email "nowyMail@aa.bb"}
                    _test-object-spec)
   (serialize-patch "" {:email "nowyMail@aa.bb"} _test-object-spec))
+
 
 (defn- serialize-delete
   [uriql-query object-data]
@@ -166,11 +123,6 @@
                                                       body-params)]
     [path-params body-params objects-data serializer-operations]))
 
-;; objects-data (server-utils/get-associated-objects (app-data :objects)
-;;                                                   tables)
-;; normalized-serializer-spec
-;;   (map (partial fields/normalize-serializer-spec ctx)
-;;     _related-serializer-spec)
 
 (def-interceptor-fn
   serialize-into-model!
@@ -202,8 +154,7 @@
         :patch
           (serialize-patch (last path-params) body-params (last objects-data))
         :delete (serialize-delete (last path-params) (last objects-data)))
-      ;; (hydrate-context ctx)
-    )))
+      (hydrate-context ctx))))
 
 (comment
   (_test-context '(serialize-into-model! _test-post-request-map))
