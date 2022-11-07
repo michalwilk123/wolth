@@ -1,12 +1,14 @@
 {:meta {:admin {:name "todoAdmin", :password "todo"}, :author "Monika Drozd"},
- :objects [{:fields [{:name "title", :type :str128}],
+ :objects [{:fields [{:constraints [:id-constraints], :name "id", :type :id}
+                     {:name "title", :type :str128}],
             :name "TodoList",
             :relations [{:name "authorId",
                          :references "User",
                          :rel-type :o2m,
                          :related-name-inside "author",
                          :related-name-outside "lists"}]}
-           {:fields [{:constraints [:not-null], :name "finished", :type :bool}
+           {:fields [{:constraints [:id-constraints], :name "id", :type :id}
+                     {:constraints [:not-null], :name "finished", :type :bool}
                      {:name "description", :type :str2048}
                      {:constraints [:not-null], :name "name", :type :str128}
                      {:name "creationDate", :type :date-tz}],

@@ -6,10 +6,12 @@
               :name "getPrimes",
               :path "functions/clojureFunction.clj"}],
  :meta {:admin {:name "myAdmin", :password "admin"}, :author "Michal Wilk"},
- :objects [{:fields [{:constraints [:not-null], :name "name", :type :str32}
+ :objects [{:fields [{:constraints [:id-constraints], :name "id", :type :id}
+                     {:constraints [:not-null], :name "name", :type :str32}
                      {:name "note", :type :text}],
             :name "Writer"}
-           {:fields [{:name "content", :type :text}],
+           {:fields [{:constraints [:id-constraints], :name "id", :type :id}
+                     {:name "content", :type :text}],
             :name "Post",
             :relations [{:name "author",
                          :references "Writer",
