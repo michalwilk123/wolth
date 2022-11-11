@@ -71,9 +71,9 @@
             {:constraints [], :name "major", :type :str128}],
    :relations [{:name "country_id",
                 :references "Country",
-                :rel-type :o2m,
-                :related-name-inside "country",
-                :related-name-outside "cities"}]})
+                :relation-type :o2m,
+                :relation-name-here "country",
+                :relation-name-outside "cities"}]})
 
 (def _test-normalized-fields
   {:id "65ebc5a7-348c-4bb7-a58b-54d96a1b41bf",
@@ -135,7 +135,7 @@
                 :name "getDate",
                 :method :get,
                 :arg-source :query,
-                :args [["num" :int]]}],
+                :arguments [["num" :int]]}],
    :serializers
      [{:name "public",
        :allowed-roles ["admin"],
@@ -190,7 +190,7 @@
     :function-name "dateFunc",
     :name "getDate",
     :path "functions/datesCode.clj",
-    :args [["num" :int]]}])
+    :arguments [["num" :int]]}])
 
 (def _resolver_func_test_namespace
   (create-ns (create-namespace-name "test-app")))
@@ -223,9 +223,9 @@
                 {:constraints [], :name "major", :type :str128}],
        :relations [{:name "country_id",
                     :references "Country",
-                    :rel-type :o2m,
-                    :related-name-inside "country",
-                    :related-name-outside "cities"}]}],
+                    :relation-type :o2m,
+                    :relation-name-here "country",
+                    :relation-name-outside "cities"}]}],
    :serializers
      [{:name "regular-view",
        :allowed-roles ["regular"],

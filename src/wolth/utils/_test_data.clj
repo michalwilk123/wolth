@@ -6,7 +6,7 @@
 
 (def _loader_test_app_data
   {:functions [{:allowed-roles ["admin"],
-                :args [["num" :int]],
+                :arguments [["num" :int]],
                 :function-name "nPrimes2",
                 :name "primes",
                 :path "functions/clojureFunction.clj",
@@ -15,9 +15,9 @@
                 :function-name "dateFunc",
                 :name "getDate",
                 :path "functions/datesCode.clj",
-                :args [["num" :int]]}
+                :arguments [["num" :int]]}
                {:allowed-roles ["admin"],
-                :args [["str" :int]],
+                :arguments [["str" :int]],
                 :function-name "isPrime?",
                 :name "check-if-prime",
                 :path "functions/clojureFunction.clj",
@@ -31,8 +31,9 @@
       {:fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
                 {:name "content", :type :text}],
        :name "Post",
-       :relations [{:name "author", :rel-type :o2m, :references "Person"}]}],
-   :persistent-db {:dbname "mydatabase", :dbtype "h2"},
+       :relations
+         [{:name "author", :relation-type :o2m, :references "Person"}]}],
+   :database-configuration {:dbname "mydatabase", :dbtype "h2"},
    :serializers [{:allowed-roles ["public"],
                   :name "public",
                   :operations [{:create {:attached [["note" "Testowa notatka"]],

@@ -1,12 +1,13 @@
-{:meta {:admin {:name "todoAdmin", :password "todo"}, :author "Monika Drozd"},
+{:database-configuration {:dbname "todoDatabase", :dbtype "h2"},
+ :meta {:admin {:name "todoAdmin", :password "todo"}, :author "Monika Drozd"},
  :objects [{:fields [{:constraints [:id-constraints], :name "id", :type :id}
                      {:name "title", :type :str128}],
             :name "TodoList",
             :relations [{:name "authorId",
                          :references "User",
-                         :rel-type :o2m,
-                         :related-name-inside "author",
-                         :related-name-outside "lists"}]}
+                         :relation-name-here "author",
+                         :relation-name-outside "lists",
+                         :relation-type :o2m}]}
            {:fields [{:constraints [:id-constraints], :name "id", :type :id}
                      {:constraints [:not-null], :name "finished", :type :bool}
                      {:name "description", :type :str2048}
@@ -15,14 +16,14 @@
             :name "TodoItem",
             :relations [{:name "todoId",
                          :references "TodoList",
-                         :related-name-inside "parent",
-                         :related-name-outside "tasks"}
+                         :relation-name-here "parent",
+                         :relation-name-outside "tasks",
+                         :relation-type :o2m}
                         {:name "authorId",
                          :references "User",
-                         :rel-type :o2m,
-                         :related-name-inside "author",
-                         :related-name-outside "todoTasks"}]}],
- :persistent-db {:dbname "todoDatabase", :dbtype "h2"},
+                         :relation-name-here "author",
+                         :relation-name-outside "todoTasks",
+                         :relation-type :o2m}]}],
  :serializers
    [{:allowed-roles ["regular" "admin"],
      :name "regular",
@@ -30,14 +31,14 @@
        [{:create {:attached [["creationDate" :today-date] ["finished" false]
                              ["authorId" :user-id]],
                   :fields ["description" "name"]},
-         :delete {:additional-query "filter(\"author\"==<:user-id>)"},
+         :delete {:additional-query "filter(\"authorId\"==<:user-id>)"},
          :model "TodoItem",
          :read
            {:additional-query
               "sortd(\"finished\")sorta(\"creationDate\")filter(\"author\"==<:user-id>)",
             :fields ["id" "todoId" "finished" "description" "name"
                      "creationDate"]},
-         :update {:additional-query "filter(\"author\"==<:user-id>)",
+         :update {:additional-query "filter(\"authorId\"==<:user-id>)",
                   :fields ["finished" "description" "name" "creationDate"]}}
         {:create {:attached [["authorId" :user-id]], :fields ["title"]},
          :delete {:additional-query "filter(\"authorId\"==<:user-id>)"},
