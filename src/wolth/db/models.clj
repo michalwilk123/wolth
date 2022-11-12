@@ -22,8 +22,9 @@
   [parent-table-name relation]
   (let [ref-field (or (relation :ref) "id")
         fk-name (format "fk_%s_%s" (relation :name) parent-table-name)
-        constraints (cons-not-nil (if (= (relation :rel-type) :o2o) :unique nil)
-                                  (relation :constraints))
+        constraints (cons-not-nil
+                      (if (= (relation :relation-type) :o2o) :unique nil)
+                      (relation :constraints))
         formatted-field (build-single-table-field
                           {:name (relation :name),
                            :type (or (relation :type) :int),
@@ -39,12 +40,12 @@
   (expand-single-relation "Post"
                           {:name "author",
                            :references "Person",
-                           :rel-type :o2m,
+                           :relation-type :o2m,
                            :constraints [:not-null],
                            :ref "username"})
   (expand-single-relation
     "Post"
-    {:name "author", :references "Person", :rel-type :o2o}))
+    {:name "author", :references "Person", :relation-type :o2o}))
 
 (defn generate-fk-fields
   [parent-table-name relations]
@@ -53,9 +54,10 @@
   (map (partial expand-single-relation parent-table-name) relations))
 
 (comment
-  (generate-fk-fields "Post"
-                      [{:name "author", :rel-type :o2m, :references "Person"}
-                       {:name "owner", :rel-type :o2o, :references "Person"}])
+  (generate-fk-fields
+    "Post"
+    [{:name "author", :relation-type :o2m, :references "Person"}
+     {:name "owner", :relation-type :o2o, :references "Person"}])
   (generate-fk-fields "Post" nil))
 
 
@@ -86,14 +88,15 @@
   {:fields [{:name "id", :type :id, :constraints [:id-constraints]}
             {:name "content", :type :text}],
    :name "Post",
-   :relations [{:name "author", :rel-type :o2m, :references "Person"}]})
+   :relations [{:name "author", :relation-type :o2m, :references "Person"}]})
 
 (def _test-object-data-3
   {:name "Worker",
    :fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
             {:name "id", :type :id, :constraints [:id-constraints]}
             {:name "first-name", :type :str128} {:name "email", :type :str128}],
-   :relations [{:name "supervisor", :rel-type :o2m, :references "Worker"}]})
+   :relations
+     [{:name "supervisor", :relation-type :o2m, :references "Worker"}]})
 
 (def _test-objects (list (generate-create-table-query _test-object-data-2)))
 
@@ -123,12 +126,12 @@
     {:fields [{:name "id", :type :id, :constraints [:id-constraints]}
               {:name "note", :type :str32}],
      :name "Person"}
-    {:name "author", :rel-type :o2m, :references "Person"})
+    {:name "author", :relation-type :o2m, :references "Person"})
   (cross-field-w-related-table
     {:fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
               {:name "note", :type :str32}],
      :name "Person"}
-    {:name "author", :rel-type :o2m, :references "Person"}))
+    {:name "author", :relation-type :o2m, :references "Person"}))
 
 (defn cross-two-tables
   [tab tab-to-fetch-info]

@@ -3,6 +3,7 @@
             [wolth.db.fields :refer [value-normalization-lut]]
             [wolth.server.utils :refer [operations-lut]]
             [wolth.utils.common :as help]
+            [clojure.pprint :refer [pprint]]
             [wolth.utils.loader :refer [load-application!]]))
 
 
@@ -28,6 +29,7 @@
 (s/def ::additional-query string?)
 (s/def ::model-fields (s/coll-of string? :distinct true :kind vector?))
 
+
 (s/def ::method (partial contains? operations-lut))
 (s/def ::arguments
   (s/coll-of (s/tuple string? ::type) :distinct true :kind vector?))
@@ -48,10 +50,11 @@
 (s/def ::wolth-table-relation
   (s/keys :req-un [::name ::relation-type ::references]))
 
+
+
 (s/def ::fields
   (s/or :serializer (s/coll-of string? :distinct true :kind vector?)
         :model (s/coll-of ::wolth-table-field :distinct true :kind vector?)))
-
 (s/def ::relations
   (s/coll-of ::wolth-table-relation :distinct true :kind vector?))
 
@@ -60,10 +63,12 @@
         :configured (s/keys :opt-un [::fields ::attached ::additional-query
                                      ::model-fields])))
 
+
 (s/def ::create ::wolth-operation-primitive)
 (s/def ::delete ::wolth-operation-primitive)
 (s/def ::read ::wolth-operation-primitive)
 (s/def ::update ::wolth-operation-primitive)
+
 
 (s/def ::admin (s/keys :req-un [::name ::password]))
 (s/def ::wolth-operation
@@ -91,10 +96,9 @@
 (def _person-application-path "test/system/person/person.app.edn")
 (def _todo-application-path "test/system/todo/todo.app.edn")
 
-(def _person-app-data (load-application! _person-application-path))
-(def _todo-app-data (load-application! _todo-application-path))
-
 (comment
+  (def _person-app-data (load-application! _person-application-path))
+  (def _todo-app-data (load-application! _todo-application-path))
   (s/explain ::meta (_todo-app-data :meta))
   (s/explain ::meta (_person-app-data :meta))
   (s/explain ::serializers (_person-app-data :serializers))
@@ -117,6 +121,15 @@
 
 (defn wolth-config-valid? [app-data] (s/valid? ::wolth-app-config app-data))
 
+(defn explain-wolth-spec
+  [app-data]
+  (some->> app-data
+           (s/explain-data ::wolth-app-config)
+           (:clojure.spec.alpha/problems)
+           (pprint)))
+
 (comment
   (wolth-config-valid? _todo-app-data)
-  (wolth-config-valid? _person-app-data))
+  (wolth-config-valid? _person-app-data)
+  (explain-wolth-spec _todo-app-data)
+  (explain-wolth-spec _person-app-data))

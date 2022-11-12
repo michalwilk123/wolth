@@ -8,8 +8,8 @@
             [clojure.set :refer [intersection]]
             [wolth.utils.common :refer [multiple-get]]
             [wolth.server.views :refer [wolth-view-interceptor]]
-            [wolth.server.utils :refer
-             [utility-interceptor actions-lut create-query-name]]
+            [wolth.server.path :refer [create-query-name]]
+            [wolth.server.utils :refer [utility-interceptor actions-lut]]
             [wolth.server.-test-data :refer
              [_test-app-data-w-relations _serializers_test_app_data]]
             [io.pedestal.http.body-params :as body-params]
@@ -24,7 +24,7 @@
   {:functions [{:function-name "timeSince",
                 :name "daysSince",
                 :allowed-roles true,
-                :args [["value"] :int],
+                :arguments [["value"] :int],
                 :path "functions/clojureFunction.clj",
                 :method :post,
                 :arg-source :body}
@@ -65,8 +65,8 @@
        (apply concat)
        (map
          (fn [m]
-           (list (multiple-get m [:related-name-inside :base :references])
-                 (multiple-get m [:related-name-outside :references :base]))))
+           (list (multiple-get m [:relation-name-here :base :references])
+                 (multiple-get m [:relation-name-outside :references :base]))))
        (apply concat)
        (map (fn [el] (vector (first el) (rest el))))
        (into {})))

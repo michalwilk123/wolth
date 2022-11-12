@@ -1,7 +1,6 @@
 (ns wolth.utils.loader
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [wolth.utils.spec :refer [test-app-structure]]
             [wolth.db.user :as user]
             [wolth.db.utils :refer [execute-sql-expr!]]
             [next.jdbc :refer [get-datasource]]
@@ -30,7 +29,6 @@
 (comment
   (load-application! _test_application_path))
 
-; tutaj odpalam spec
 (defn test-application-file!
   [app-path]
   (let [file-obj (io/file app-path)]
@@ -41,8 +39,7 @@
         (throw-loader-exception
           (format
             "Could not load file: %s because current user has no read permission"
-            app-path)))
-    (test-app-structure (slurp file-obj)))
+            app-path))))
   (log/info ::test-application-file!
             (format "File %s loaded without errors" app-path)))
 
@@ -79,7 +76,7 @@
 (defn store-db-connections!
   [app-names app-datas]
   (let [cursors (zipmap app-names
-                        (map #(get-datasource (get % :persistent-db))
+                        (map #(get-datasource (get % :database-configuration))
                           app-datas))]
     (reset! cursor-pool cursors)
     (log/info ::store-db-connections!

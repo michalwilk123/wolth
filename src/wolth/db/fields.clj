@@ -11,7 +11,7 @@
 
 (def ^:private key-normalization-lut {:password [:str128 create-password-hash]})
 
-(def ^:private value-normalization-lut
+(def value-normalization-lut
   {:random-uuid common/create-uuid,
    :today-date common/today-date,
    :user-id common/get-user-id,
