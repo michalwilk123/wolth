@@ -381,3 +381,8 @@
 
 (comment
   (create-uuid))
+
+(defn tee [func dat] (doall (func dat)) dat)
+
+(comment
+  (tee (fn [x] (println x)) "lalalala"))

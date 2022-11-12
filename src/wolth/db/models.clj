@@ -1,10 +1,11 @@
 (ns wolth.db.models
   (:require [honey.sql :as sql]
             [clojure.string :as str]
+            [io.pedestal.log :as log]
             [honey.sql.helpers :as hsql]
             [wolth.utils.common :refer
              [field-lut translate-keys-to-vals constraints-lut cons-not-nil
-              find-first]]))
+              find-first tee]]))
 
 
 (defn build-single-table-field
@@ -95,8 +96,11 @@
    :fields [{:name "id", :type :uuid, :constraints [:uuid-constraints]}
             {:name "id", :type :id, :constraints [:id-constraints]}
             {:name "first-name", :type :str128} {:name "email", :type :str128}],
-   :relations
-     [{:name "supervisor", :relation-type :o2m, :references "Worker"}]})
+   :relations [{:name "supervisorId",
+                :relation-type :o2m,
+                :references "Worker",
+                :related-name-inside "supervisor",
+                :related-name-outside "supervised_people"}]})
 
 (def _test-objects (list (generate-create-table-query _test-object-data-2)))
 
@@ -163,6 +167,9 @@
   (->> objects-data
        (cross-together-table-data)
        (map generate-create-table-query)
+       (tee (fn [tabs]
+              (log/info ::generate-create-table-sql
+                        (str "Created Tables: " (vec tabs)))))
        (map list)))
 
 (comment

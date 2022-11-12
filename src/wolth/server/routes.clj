@@ -1,12 +1,11 @@
 (ns wolth.server.routes
-  (:require [wolth.server.requests :as requests]
-            [wolth.utils.auth :as auth]
+  (:require [wolth.utils.auth :as auth]
             [wolth.utils.misc :refer [generate-full-model-chain]]
             [io.pedestal.log :as log]
             [wolth.server.serializers :as serializers]
             [clojure.string :as str]
             [clojure.set :refer [intersection]]
-            [wolth.utils.common :refer [multiple-get]]
+            [wolth.utils.common :refer [multiple-get tee]]
             [wolth.server.views :refer [wolth-view-interceptor]]
             [wolth.server.path :refer [create-query-name]]
             [wolth.server.utils :refer [utility-interceptor actions-lut]]
@@ -242,21 +241,24 @@
 
 (defn generate-routes-for-app
   [app-name app-data]
-  (let [routes (concat
-                 (apply concat
-                   (generate-routes-for-serializers app-name
-                                                    (app-data :objects)
-                                                    (app-data :serializers)))
-                 (generate-common-utility-routes app-name)
-                 (generate-routes-for-functions app-name
-                                                (get app-data :functions [])))]
-    (run!
-      (fn [rt]
-        (let [f-string (format "Method: %s, URL: %s;" (second rt) (first rt))]
-          (log/info ::generate-routes-for-app f-string)
-          (println f-string)))
-      routes)
-    routes))
+  (letfn
+    [(log-routes [routes]
+       (log/info ::generate-routes-for-app "Creating routes")
+       (for [route routes]
+         (let [f-string
+                 (format "Method: %s, URL: %s;" (second route) (first route))]
+           (log/info ::generate-routes-for-app f-string)
+           (println f-string))))]
+    (as-> (generate-routes-for-serializers app-name
+                                           (app-data :objects)
+                                           (app-data :serializers))
+      it
+      (apply concat it)
+      (concat it (generate-common-utility-routes app-name))
+      (concat it
+              (generate-routes-for-functions app-name
+                                             (get app-data :functions [])))
+      (tee log-routes it))))
 
 (comment
   (generate-routes-for-app "test-app" _test-app-data)
@@ -276,80 +278,6 @@
   (generate-routes (list "test-app") (list _test-app-data))
   (generate-routes (list "test-app" "geoapp")
                    (list _test-app-data _test-app-data-w-relations)))
-
-;;; ============ NOT RELEVANT =================
-
-;; (defn depr-generate-routes-for-serializer
-;;   [app-name serializer]
-;;   (apply concat
-;;     (map (partial generate-routes-for-serializer-operation
-;;                   app-name
-;;                   (get serializer :name))
-;;       (get serializer :operations))))
-
-;; (comment
-;;   (depr-generate-routes-for-serializer
-;;     "person"
-;;     {:allowed-roles ["admin"],
-;;      :name "public",
-;;      :operations [{:update {:fields ["username"]}, :model "User"}
-;;                   {:delete true,
-;;                    :model "Person",
-;;                    :read {:attached [], :fields ["name" "note" "id"]},
-;;                    :update {:fields ["name"]}}]})
-;;   (depr-generate-routes-for-serializer "person"
-;;                                        (get-in _test-app-data
-;;                                                [:serializers 0])))
-
-(def ii
-  {:name ::DSAKDNS,
-   :enter (fn [x]
-            (assoc x
-              :response {:status 201,
-                         :body (str "TESTING MESSAGEE  "
-                                    (select-keys x
-                                                 [:exception-occured :response
-                                                  :request]))}))})
-
-(defn test-resp [ctx] {:status 200, :body "OK"})
-
-(def route-table
-  (route/expand-routes
-    #{["/app/Person/:Person_query" :get 'requests/build-read-request :route-name
-       :nazwa-routa]
-      ["/app/Person/:Person_query/admin" :get 'requests/build-read-request
-       :route-name :nazwa-routa-num2]
-      ["/person/auth" :post
-       [(body-params/body-params) http/json-body utility-interceptor
-        auth/token-auth-login-interceptor] :route-name :app-token-request]
-      ["/app/Person/:Person_query/User/:User_query/admin" :get
-       requests/build-read-request :route-name :nazwa-routa-num3]
-      ["/person/Person/public" :post
-       [(body-params/body-params) http/json-body utility-interceptor
-        auth/authenticator-interceptor auth/model-authorizer-interceptor
-        wolth-view-interceptor] :route-name :nazwa-posta-routa]
-      ["/person/User/:id/user-admin" :get
-       [(body-params/body-params) http/json-body utility-interceptor
-        auth/authenticator-interceptor auth/model-authorizer-interceptor
-        serializers/model-serializer-interceptor wolth-resolver-interceptor
-        wolth-view-interceptor] :route-name :czytanie-zwyklego-usera]
-      ["/person/User/user-regular" :post
-       [(body-params/body-params) http/json-body utility-interceptor
-        auth/authenticator-interceptor auth/model-authorizer-interceptor
-        ; serializers/model-serializer-interceptor
-        ii] :route-name :tworzenie-zwyklego-usera]
-      ["/app2/Person" :post
-       [(body-params/body-params) 'http/json-body
-        'serializers/model-serializer-interceptor
-        'requests/build-create-request] :route-name :nazwa-test-posta-routa]}))
-
-
-(def url-for (route/url-for-routes route-table))
-
-(comment
-  (first (clojure.pprint/pprint route-table))
-  (url-for :czytanie-zwyklego-usera {:hehe 2222})
-  (url-for :tworzenie-zwyklego-usera))
 
 (defn generate-routes-for-serializer-operation
   [app-name serializer-name serializer-operation]
