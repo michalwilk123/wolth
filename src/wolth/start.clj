@@ -2,13 +2,14 @@
   (:gen-class)
   (:require [io.pedestal.http :as http]
             [io.pedestal.http.route :as route]
-            [wolth.server.utils :refer [app-path->app-name]]
             [wolth.server.config :refer [wolth-routes]]
+            [wolth.server.routes :as r]
+            [wolth.server.utils :refer [app-path->app-name]]
             [wolth.utils.loader :refer
-             [load-application! test-application-file! load-user-functionalities
-              store-applications! store-db-connections! load-bank-functions!
-              create-sql-tables! create-admin-account!]]
-            [wolth.server.routes :as r]))
+             [create-admin-account! create-sql-tables! load-application!
+              load-bank-functions! load-user-functionalities store-applications!
+              store-db-connections! test-application-file!]]
+            [wolth.utils.spec :refer [explain-wolth-spec wolth-config-valid?]]))
 
 (defn respond-hello
   [request]          ;; <1>
@@ -38,7 +39,7 @@
 
 (defn stop-server [] (http/stop @server-instance))
 
-(def _test-application-path "test/system/person/person.app.edn")
+(def _person-application-path "test/system/person/person.app.edn")
 (def _todo-application-path "test/system/todo/todo.app.edn")
 
 (defn configure-wolth
@@ -58,17 +59,62 @@
     nil))
 
 (comment
-  ;; (configure-wolth _test-application-path)
+  (configure-wolth _person-application-path)
   (configure-wolth _todo-application-path))
 
 
 (defn init-server
-  [& app-paths]
-  (configure-wolth app-paths)
+  [app-paths]
+  (apply configure-wolth app-paths)
   (create-server)
   (start-server))
 
-(defn -main [& app-paths] (configure-wolth app-paths))
+(comment
+  (init-server (list _todo-application-path _person-application-path)))
+
+(defn configs-validated?
+  [app-paths]
+  (->> app-paths
+       (map load-application!)
+       (every? wolth-config-valid?)))
+
+(comment
+  (configs-validated? (list _todo-application-path)))
+
+(defn run-checks-on-wolth-configs
+  [app-paths]
+  (->> app-paths
+       (map load-application!)
+       (run! explain-wolth-spec)))
+
+(comment
+  (run-checks-on-wolth-configs (list _todo-application-path)))
+
+(defn -main
+  ([command & app-paths]
+   (case command
+     "run"
+       (if (configs-validated? app-paths)
+         (init-server app-paths)
+         (println
+           "Errors occured. Cannot start the server. You can check the errors by running 'check' command or try to run incorrect schema by running 'force-run' command"))
+     "force-run" (init-server app-paths)
+     "check" (run-checks-on-wolth-configs app-paths)
+     (-main)))
+  ([]
+   (println
+     "Wolth by Michał Wilk
+This is a tool to generate web applications based 
+on text configuration.
+Available commands:
+  * run - run all applications by supplied paths (run checks)
+  * force-run - run all applications by supplied paths (dont run checks)
+  * check - check for errors in given app paths")))
+
+(comment
+  (-main "lalala")
+  (-main)
+  (-main "check" _todo-application-path))
 
 (comment
   (create-server)
