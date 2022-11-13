@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
-      run: lein deps
+      run: lein deps ; pip3 install -r requirements.txt
     - name: Run checks on person app
       run: lein run check test/system/person/person.app.edn
     - name: Run checks on todo app

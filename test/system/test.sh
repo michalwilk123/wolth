@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# install python deps
-# pip3 install -r requirements.txt
-
 test_person(){
     sleep 20
     echo "Running tests..."
