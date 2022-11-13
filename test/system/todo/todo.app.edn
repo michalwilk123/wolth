@@ -35,7 +35,7 @@
          :model "TodoItem",
          :read
            {:additional-query
-              "sortd(\"finished\")sorta(\"creationDate\")filter(\"authorId\"==<:user-id>or\"authorId\"=='nil')",
+              "sortd(\"finished\")sorta(\"creationDate\")filter(\"authorId\"==<:user-id>)",
             :fields ["id" "finished" "description" "name" "creationDate"]},
          :update {:additional-query "filter(\"authorId\"==<:user-id>)",
                   :fields ["finished" "description" "name" "creationDate"]}}
