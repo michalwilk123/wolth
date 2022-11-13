@@ -15,6 +15,7 @@
   {:random-uuid common/create-uuid,
    :today-date common/today-date,
    :user-id common/get-user-id,
+   :null (fn [_] nil),
    :user-username common/get-user-name})
 
 (defn normalize-value-field
