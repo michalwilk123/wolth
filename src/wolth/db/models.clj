@@ -168,8 +168,8 @@
        (cross-together-table-data)
        (map generate-create-table-query)
        (tee (fn [tabs]
-              (log/info ::generate-create-table-sql
-                        (str "Created Tables: " (vec tabs)))))
+              (log/info ::generate-create-table-sql "Creating SQL tables")
+              (for [t tabs] (log/info ::generate-create-table-sql t))))
        (map list)))
 
 (comment

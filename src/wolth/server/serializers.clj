@@ -143,10 +143,7 @@
                                           _app-data
                                           request-method
                                           tables
-                                          serializer-name)
-        ;; [path-params body-params] (normalize-params ctx
-        ;; _related-serializer-spec _path-params _body-params)
-       ]
+                                          serializer-name)]
     (->>
       (case request-method
         :post (serialize-post body-params (last objects-data))
@@ -175,10 +172,10 @@
 (comment
   (fetch-bank-params
     (_test-bank-request-map :request)
-    {:name "getDate", :arg-source :query, :args [["num" :int]]})
+    {:name "getDate", :arg-source :query, :arguments [["num" :int]]})
   (fetch-bank-params
     (_test-bank-request-map :request)
-    {:name "getDate", :arg-source :body, :args [["num" :int]]}))
+    {:name "getDate", :arg-source :body, :arguments [["num" :int]]}))
 
 #_"Below interceptor fetches and VALIDATES PARAMETERS
    This is the diffrence between model and bank serializer.
@@ -196,8 +193,8 @@
         f-serializer (utils/find-first #(= (get % :name) func-name)
                                        (app-data :functions))
         params (fetch-bank-params request-data f-serializer)
-        params-normalized (bank-utils/normalize-params params
-                                                       (f-serializer :args))]
+        params-normalized
+          (bank-utils/normalize-params params (f-serializer :arguments))]
     (assoc ctx
       :function-data {:function-name func-name,
                       :function-args params-normalized})))

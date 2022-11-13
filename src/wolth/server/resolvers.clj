@@ -21,6 +21,7 @@
 (defn- resolve-model
   [ctx sql-query]
   (let [result (execute-sql-expr! (get ctx :app-name) sql-query)]
+    (log/info ::resolve-model result)
     (as-> ctx it (dissoc it :sql-query) (assoc it :model-result result))))
 
 (defn- resolve-bank

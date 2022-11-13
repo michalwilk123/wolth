@@ -1,16 +1,13 @@
 (ns wolth.server.utils
   (:require [clojure.string :as str]
-            [clojure.set :refer [difference map-invert]]
-            [ring.util.codec :refer [url-decode]]
-            [wolth.db.urisql-parser :refer [apply-uriql-syntax-sugar]]
+            [clojure.set :refer [map-invert]]
             [wolth.server.-test-data :refer
              [_server_test_app_data _test-object-spec-with-relations-1
               _test-object-spec-with-relations-2]]
             [wolth.server.config :refer [app-data-container]]
             [wolth.server.exceptions :refer
              [def-interceptor-fn throw-wolth-exception]]
-            [wolth.utils.common :as common]
-            [wolth.db.fields :as fields]))
+            [wolth.utils.common :as common]))
 
 (def operations-lut
   {:post :create, :delete :delete, :get :read, :patch :update})
@@ -110,37 +107,11 @@
     :delete))
 
 
-(defn sanitize-uriql-query
-  [query]
-  (-> query
-      (url-decode)
-      (apply-uriql-syntax-sugar)))
-
-(defn create-query-name [model-name] (format "%s-query" model-name))
-
-(defn get-query-urls-in-order
-  [objects-names query-params]
-  (when (not= (count objects-names) (count query-params))
-    (throw-wolth-exception
-      :400
-      "Cannot parse all parameters needed to build the query"))
-  (map (fn [it]
-         (->> it
-              (create-query-name)
-              (keyword)
-              (get query-params)))
-    objects-names))
-
-(comment
-  (get-query-urls-in-order (list "User") {:User-query "*"})
-  (get-query-urls-in-order (list "Country" "City")
-                           {:Country-query "filter(\"countryName\"=='Poland')",
-                            :City-query "filter(\"cityName\"<>'Gdansk')"}))
 
 (defn- find-matching-relation-data
   [fields model-data other-model-name-to-match & {:keys [related-inside?]}]
   (let [field-to-fetch
-          (if related-inside? :related-name-inside :related-name-outside)]
+          (if related-inside? :relation-name-here :relation-name-outside)]
     (letfn [(field-exists-in-relation? [rel-data field]
               (and (= field (get rel-data field-to-fetch))
                    (= other-model-name-to-match (get rel-data :references))))
@@ -175,9 +146,9 @@
                                                 :related-inside?
                                                 false)]
     (-> (cond l-relation {:joint [(l-relation :name) "id"],
-                          :field-to-inject (l-relation :related-name-inside)}
+                          :field-to-inject (l-relation :relation-name-here)}
               r-relation {:joint ["id" (r-relation :name)],
-                          :field-to-inject (r-relation :related-name-outside)}
+                          :field-to-inject (r-relation :relation-name-outside)}
               :else (throw-wolth-exception
                       :500
                       (format "Could not join two objects: %s and %s"

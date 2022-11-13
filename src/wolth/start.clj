@@ -11,11 +11,6 @@
               store-db-connections! test-application-file!]]
             [wolth.utils.spec :refer [explain-wolth-spec wolth-config-valid?]]))
 
-(defn respond-hello
-  [request]          ;; <1>
-  {:status 200, :body "Hello, world!"}) ;; <2>
-
-
 (def initial
   {:env :dev,
    ;; do not block thread that starts web server
@@ -122,8 +117,5 @@ Available commands:
   (@server-instance)
   (reset! server-instance initial)
   (start-server)
-  (stop-server)
-  (route/expand-routes (deref #'r/route-table-v2))
-  (route/expand-routes r/route-table-v2)
-  (r/route-table-v2))
+  (stop-server))
 
