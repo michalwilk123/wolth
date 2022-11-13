@@ -4,7 +4,7 @@
 pip3 install -r requirements.txt
 
 test_person(){
-    sleep 10
+    sleep 20
     python3 -m pytest test/system/person/test_person_app.py 
     pkill java
 }
