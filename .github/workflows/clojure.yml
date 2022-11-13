@@ -15,5 +15,9 @@ jobs:
     - uses: actions/checkout@v3
     - name: Install dependencies
       run: lein deps
-    - name: Run tests
-      run: lein test
+    - name: Run checks on person app
+      run: lein run check test/system/person/person.app.edn
+    - name: Run checks on todo app
+      run: lein run check test/system/todo/todo.app.edn
+    - name: Run system tests on person app
+      run: source test/system/test.sh

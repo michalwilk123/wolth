@@ -123,10 +123,11 @@
 
 (defn explain-wolth-spec
   [app-data]
-  (some->> app-data
-           (s/explain-data ::wolth-app-config)
-           (:clojure.spec.alpha/problems)
-           (pprint)))
+  (if-let [problems (some->> app-data
+                             (s/explain-data ::wolth-app-config)
+                             (:clojure.spec.alpha/problems))]
+    (pprint problems)
+    (println "OK")))
 
 (comment
   (wolth-config-valid? _todo-app-data)

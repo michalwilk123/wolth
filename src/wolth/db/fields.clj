@@ -80,10 +80,7 @@
   (normalize-additional-uriql-query
     {:logged-user {:id 221, :username "DominoJachas"}}
     "filter(\"name\"==<:user-username>and\"id\"<><:user-id>)")
-  (normalize-additional-uriql-query
-   {}
-   "filter(\"author\"==<:null>)")
-  )
+  (normalize-additional-uriql-query {} "filter(\"author\"==<:null>)"))
 
 
 (defn normalize-serializer-spec
