@@ -28,6 +28,7 @@
   (normalize-value-field {} :random-uuid)
   (normalize-value-field {} :today-date)
   (normalize-value-field {:logged-user {:id 112}} :user-id)
+  (normalize-value-field {:logged-user {:id 112}} :null)
   (normalize-value-field {:logged-user {:username "marik1234"}} :user-username)
   (normalize-value-field {} "jakies dane"))
 
@@ -49,6 +50,16 @@
        (str/join "|")
        (re-pattern)))
 
+#_"(13.11.2022) TODO: there is complex bug going on. So basically 
+   with the way we doin the uriql-query hydration. 
+   We just restricted everything to only use the
+   string in additional-query field. The explantion here is simple,
+   you unfortunatly cannot concatenate native java objects to string reliably.
+   (Of course you can use some wierd hax, but it is just bad design to do so)
+   This would mean passing this in diffrent way, which would open up
+   many possibilities for even more complex function kwords.
+   But unfortunatly, it will take some time to implement which i do not
+   posses right now"
 (defn normalize-additional-uriql-query
   [ctx query]
   (->> query
@@ -68,7 +79,11 @@
 (comment
   (normalize-additional-uriql-query
     {:logged-user {:id 221, :username "DominoJachas"}}
-    "filter(\"name\"==<:user-username>and\"id\"<><:user-id>)"))
+    "filter(\"name\"==<:user-username>and\"id\"<><:user-id>)")
+  (normalize-additional-uriql-query
+   {}
+   "filter(\"author\"==<:null>)")
+  )
 
 
 (defn normalize-serializer-spec
