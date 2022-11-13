@@ -1,4 +1,5 @@
-(ns wolth.utils.misc)
+(ns wolth.utils.misc
+  (:require [wolth.utils.common :refer [tee]]))
 
 (defn get-relevant-relations
   [joins chain]
@@ -47,3 +48,50 @@
   (generate-full-model-chain '(("Country") ("City"))
                              '(("Country" "City") ("City" "Country"))
                              2))
+
+(defn unflat-end-condition
+  [maps next-name]
+  (and (-> maps
+           (count)
+           (= 1))
+       (as-> maps it (first it) (get it next-name) (vals it) (every? nil? it))))
+
+(comment
+  (unflat-end-condition [{:aa {:a 1, :b 2}, :bb {:c 1, :d 1}}
+                         {:aa {:a 1, :b 2}, :bb {:c 1, :d 1}}]
+                        :bb)
+  (unflat-end-condition [{:aa {:a 1, :b 2}, :bb {:c 1, :d 1}}] :bb)
+  (unflat-end-condition [{:aa {:a 1, :b 2}, :bb {:c nil, :d nil}}] :bb))
+
+(defn unflat-nested-struct
+  [structs path end-condition?]
+  (let [relevant-tab (first path)
+        next-paths (rest path)]
+    (if (empty? next-paths)
+      (map (fn [x] (get x relevant-tab)) structs)
+      (as-> structs it
+        (reduce (fn [acc item]
+                  (let [curr-k (get item relevant-tab)
+                        next-val (dissoc item relevant-tab)
+                        current (get acc curr-k '())]
+                    (assoc acc curr-k (cons next-val current))))
+          {}
+          it)
+        (for [[k value] it]
+          (vector k
+                  (if (end-condition? value (first next-paths))
+                    (list)
+                    (unflat-nested-struct value next-paths end-condition?))))
+        (into {} it)))))
+
+(comment
+  (unflat-nested-struct [{"a" 1, "b" 2} {"a" 1, "b" 2} {"a" 3, "b" 2}
+                         {"a" 2, "b" 4} {"a" 1, "b" 4} {"a" 1, "b" 9}
+                         {"a" 2, "b" 4} {"a" 4, "b" 0}]
+                        ["a" "b"]
+                        (fn [ms name] (= (get (first ms) name) 0)))
+  (unflat-nested-struct [{"a" 1, "b" 2} {"a" 1, "b" 2} {"a" 3, "b" 2}
+                         {"a" 2, "b" 4} {"a" 1, "b" 4} {"a" 1, "b" 9}
+                         {"a" 2, "b" 4} {"a" 4, "b" 0}]
+                        ["a"]
+                        (fn [ms name] (= (get (first ms) name) 0))))

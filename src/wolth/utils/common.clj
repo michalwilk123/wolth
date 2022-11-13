@@ -1,6 +1,8 @@
 (ns wolth.utils.common
   (:require [clojure.string :as str]
             [wolth.db.utils :refer [execute-sql-expr!]]
+            [wolth.utils.misc :refer
+             [unflat-end-condition unflat-nested-struct]]
             [io.pedestal.log :as log])
   (:import [java.util UUID]))
 
@@ -51,6 +53,11 @@
   (translate-keys-to-vals [:not-null] constraints-lut)
   (translate-keys-to-vals [:not-null :foo] constraints-lut))
 
+(defn tee [func dat] (doall (func dat)) dat)
+
+(comment
+  (tee (fn [x] (println x)) "lalalala"))
+
 (defn vector-contains?
   [vec needle]
   ; i want to cast nil to boolean so i use some and some? simultaneously
@@ -71,6 +78,7 @@
 (comment
   (cons-not-nil 11 [1 2 3 4])
   (cons-not-nil 11 nil)
+  (cons-not-nil nil nil)
   (cons-not-nil nil '(1 2 3))
   (cons-not-nil nil [1 2 3 4]))
 
@@ -268,25 +276,25 @@
 
 (defn squash-maps
   [maps table-names]
-  (if (= (count table-names) 1)
-    (map (fn [el] (get el (first table-names))) maps)
-    (let [tab-1 (first table-names)]
-      (as-> maps it
-        (reduce (fn [acc el]
-                  (update acc (el tab-1) (partial cons (dissoc el tab-1))))
-          {}
-          it)
-        (map (fn [[k val]] [k (squash-maps val (rest table-names))]) it)
-        (into {} it)))))
+  (unflat-nested-struct maps table-names unflat-end-condition))
 
 (comment
   (squash-maps [{"tab1" {:aa 1}, "tab2" {:dd "bb"}}
                 {"tab1" {:aa 2}, "tab2" {:dd "aa"}}
                 {"tab1" {:aa 2}, "tab2" {:dd "gg"}}]
                (list "tab1" "tab2"))
+  (squash-maps [{"tab1" {:aa 1}, "tab2" {:dd "bb"}}
+                {"tab1" {:aa 2}, "tab2" {:dd "aa"}}
+                {"tab1" {:aa nil}, "tab2" {:dd "gg"}}]
+               (list "tab1" "tab2"))
   (squash-maps [{"tab1" {:aa 1}, "tab2" {:dd "bb"}, "tab3" {:qq 1}}
                 {"tab1" {:aa 2}, "tab2" {:dd "aa"}, "tab3" {:qq 2}}
                 {"tab1" {:aa 2}, "tab2" {:dd "gg"}, "tab3" {:qq 3}}]
+               (list "tab1" "tab2" "tab3"))
+  (squash-maps [{"tab1" {:aa 1}, "tab2" {:dd "bb"}, "tab3" {:qq 1}}
+                {"tab1" {:aa 2}, "tab2" {:dd "aa"}, "tab3" {:qq nil}}
+                {"tab1" {:aa 2}, "tab2" {:dd "cc"}, "tab3" {:qq nil}}
+                {"tab1" {:aa 3}, "tab2" {:dd nil}, "tab3" {:qq nil}}]
                (list "tab1" "tab2" "tab3"))
   (squash-maps [{"tab1" {:aa 1}} {"tab1" {:aa 2}} {"tab1" {:aa 2}}]
                (list "tab1")))
@@ -313,34 +321,33 @@
                                        {:dd "aa"} ({:qq 2})}}
                             (list "tab1-items" "tab2-items")))
 
-;; (defn empty-relation?
-;;   [sql-result]
-;;   (some? (find-first (fn [[k val]]
-;;                        (and (-> k
-;;                                 (name)
-;;                                 (= "ID"))
-;;                             (nil? val)))
-;;                      sql-result)))
+(defn empty-relation?
+  [sql-result]
+  (some? (find-first (fn [[k val]]
+                       (and (-> k
+                                (name)
+                                (= "ID"))
+                            (nil? val)))
+                     sql-result)))
 
-;; (comment
-;;   (empty-relation? {:WRITER/NAME "writer3",
-;;                     :WRITER/NOTE "Testowa notatka",
-;;                     :WRITER/ID 3,
-;;                     :POST/ID 3,
-;;                     :POST/AUTHOR 3,
-;;                     :POST/CONTENT "pierwszy post"})
-;;   (empty-relation? {:WRITER/NAME "writer3",
-;;                     :WRITER/NOTE "Testowa notatka",
-;;                     :WRITER/ID nil,
-;;                     :POST/ID 3,
-;;                     :POST/AUTHOR 3,
-;;                     :POST/CONTENT "pierwszy post"}))
+(comment
+  (empty-relation? {:WRITER/NAME "writer3",
+                    :WRITER/NOTE "Testowa notatka",
+                    :WRITER/ID 3,
+                    :POST/ID 3,
+                    :POST/AUTHOR 3,
+                    :POST/CONTENT "pierwszy post"})
+  (empty-relation? {:WRITER/NAME "writer3",
+                    :WRITER/NOTE "Testowa notatka",
+                    :WRITER/ID nil,
+                    :POST/ID 3,
+                    :POST/AUTHOR 3,
+                    :POST/CONTENT "pierwszy post"}))
 
 (defn create-nested-sql-result
   [parsed-result tables relation-fields]
   (let [uppercased-table-names (map str/upper-case tables)]
     (as-> parsed-result it
-      ;; (remove empty-relation? it)
       (map parse-multitable-sql-result it)
       (squash-maps it uppercased-table-names)
       (join-queries-with-fields it relation-fields))))
@@ -381,8 +388,3 @@
 
 (comment
   (create-uuid))
-
-(defn tee [func dat] (doall (func dat)) dat)
-
-(comment
-  (tee (fn [x] (println x)) "lalalala"))
