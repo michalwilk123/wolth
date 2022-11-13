@@ -20,4 +20,4 @@ jobs:
     - name: Run checks on todo app
       run: lein run check test/system/todo/todo.app.edn
     - name: Run system tests on person app
-      run: source test/system/test.sh
+      run: source test/system/test.sh 2> /dev/null
