@@ -38,7 +38,7 @@ async def test_create_user(http_client):
         assert resp.status == 403
 
     async with http_client.delete(
-        BASE_URL + f"/User/role<>admin/user-admin",
+        BASE_URL + f"/User/\"role\"<>'admin'/user-admin",
         headers={"auth-token": token},
     ) as resp:
         assert resp.status == 200
@@ -53,7 +53,7 @@ async def test_create_user(http_client):
         payload = await resp.json()
 
     async with http_client.get(
-        BASE_URL + f"/User/username=={TEST_NAME}/user-admin",
+        BASE_URL + f"/User/\"username\"=='{TEST_NAME}'/user-admin",
         headers={"auth-token": token},
     ) as resp:
         assert resp.status == 200
@@ -61,7 +61,7 @@ async def test_create_user(http_client):
         user_id = payload[0].get("id")
 
     async with http_client.delete(
-        BASE_URL + f"/User/id=={user_id}/user-admin",
+        BASE_URL + f"/User/\"id\"=='{user_id}'/user-admin",
         headers={"auth-token": token},
     ) as resp:
         assert resp.status == 200
