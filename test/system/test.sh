@@ -5,6 +5,7 @@ test_person(){
     echo "Running tests..."
     python3 -m pytest test/system/person/test_person_app.py 
     pkill java
+    return 0
 }
 
 # execute tests
