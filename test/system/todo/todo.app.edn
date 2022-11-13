@@ -30,14 +30,13 @@
      :operations
        [{:create {:attached [["creationDate" :today-date] ["finished" false]
                              ["authorId" :user-id]],
-                  :fields ["description" "name"]},
+                  :fields ["description" "name" "todoId"]},
          :delete {:additional-query "filter(\"authorId\"==<:user-id>)"},
          :model "TodoItem",
          :read
            {:additional-query
-              "sortd(\"finished\")sorta(\"creationDate\")filter(\"author\"==<:user-id>)",
-            :fields ["id" "todoId" "finished" "description" "name"
-                     "creationDate"]},
+              "sortd(\"finished\")sorta(\"creationDate\")filter(\"authorId\"==<:user-id>or\"authorId\"=='nil')",
+            :fields ["id" "finished" "description" "name" "creationDate"]},
          :update {:additional-query "filter(\"authorId\"==<:user-id>)",
                   :fields ["finished" "description" "name" "creationDate"]}}
         {:create {:attached [["authorId" :user-id]], :fields ["title"]},
