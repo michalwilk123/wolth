@@ -3,7 +3,7 @@
             [io.pedestal.log :as log]
             [next.jdbc :as jdbc]
             [wolth.server.config :refer [def-context cursor-pool]]
-            [wolth.utils.common :refer [sql-map->map]]
+            [wolth.server.views :refer [sql-map->map]]
             [honey.sql :as sql]))
 
 (def-context _test-context

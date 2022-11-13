@@ -1,5 +1,4 @@
-(ns wolth.utils.misc
-  (:require [wolth.utils.common :refer [tee]]))
+(ns wolth.utils.misc)
 
 (defn get-relevant-relations
   [joins chain]

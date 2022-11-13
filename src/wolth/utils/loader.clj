@@ -173,6 +173,7 @@
           (create-ns sym-namespace))))
     app-names))
 
+#_{:clj-kondo/ignore [:unresolved-namespace]}
 (comment
   (create-namespaces! (list "application1" "app2"))
   @bank-namespaces
