@@ -9,7 +9,9 @@
 
 (defn translate-to-readable-form
   [val]
-  (if (instance? java.sql.Clob val) (clob-to-string val) val))
+  (cond (instance? java.sql.Clob val) (clob-to-string val)
+        (instance? org.h2.api.TimestampWithTimeZone val) (.toString val)
+        :else val))
 
 (comment
   (translate-to-readable-form 1))
