@@ -241,4 +241,34 @@
                     "filter(\"major\"<>'Adam West'and\"author\"==<:user-id>)",
                   :model-fields ["country"]}}]}]})
 
+(def _test-app-data-w-relations-v2
+  {:objects
+     [{:fields
+         [{:constraints [:id-constraints], :name "id", :type :id}
+          {:constraints [:not-null], :name "dzien", :type :int}
+          {:constraints [:not-null], :name "miesiac", :type :int}
+          {:constraints [:not-null], :name "godzinaRozpoczecia", :type :int}
+          {:constraints [:not-null], :name "liczbaGodzin", :type :int}
+          {:name "opis", :type :str2048}],
+       :name "WpisKartyPracy",
+       :relations [{:name "pracownikId",
+                    :references "User",
+                    :relation-name-here "pracownik",
+                    :relation-name-outside "wpisyPracownika",
+                    :relation-type :o2m}]}],
+   :serializers [{:allowed-roles ["kadry" "admin"],
+                  :name "dlaKadr",
+                  :operations
+                    [{:create {:fields ["dzien" "miesiac" "godzinaRozpoczecia"
+                                        "liczbaGodzin" "opis"]},
+                      :delete true,
+                      :model "WpisKartyPracy",
+                      :read {:fields ["dzien" "miesiac" "godzinaRozpoczecia"
+                                      "liczbaGodzin" "pracownikId" "opis"],
+                             :model-fields ["pracownik"]},
+                      :update true}
+                     {:model "User",
+                      :model-fields ["wpisyPracownika"],
+                      :read {:fields ["username" "id"]}}]}]})
+
 ; =============== TEST DATA FOR routes.clj ================ END

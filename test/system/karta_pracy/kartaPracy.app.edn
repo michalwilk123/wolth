@@ -1,0 +1,65 @@
+{:database-configuration {:dbname "kartaPracy", :dbtype "h2"},
+ :meta {:admin {:name "administrator", :password "haslo"},
+        :author "michalwilk123"},
+ :objects
+   [{:fields [{:constraints [:id-constraints], :name "id", :type :id}
+              {:constraints [:not-null], :name "dzien", :type :int}
+              {:constraints [:not-null], :name "miesiac", :type :int}
+              {:constraints [:not-null], :name "godzinaRozpoczecia", :type :int}
+              {:constraints [:not-null], :name "liczbaGodzin", :type :int}
+              {:name "opis", :type :str2048}],
+     :name "WpisKartyPracy",
+     :relations [{:name "pracownikId",
+                  :references "User",
+                  :relation-name-here "pracownik",
+                  :relation-name-outside "wpisyPracownika",
+                  :relation-type :o2m}]}
+    {:fields
+       [{:constraints [:id-constraints], :name "id", :type :id}
+        {:constraints [:not-null :unique], :name "numerBankowy", :type :str256}
+        {:constraints [:not-null], :name "miejsceZamieszkania", :type :str128}
+        {:constraints [:not-null],
+         :name "wynagrodzenieBruttoGodzinowe",
+         :type :float}],
+     :name "DanePracownika",
+     :relations [{:name "pracownikId",
+                  :references "User",
+                  :relation-name-here "pracownikZDanymi",
+                  :relation-name-outside "dane",
+                  :relation-type :o2o}]}],
+ :serializers
+   [{:allowed-roles ["admin" "zleceniobiorca"],
+     :name "dlaZleceniobiorcow",
+     :operations
+       [{:create {:attached [["pracownikId" :user-id]],
+                  :fields ["dzien" "miesiac" "godzinaRozpoczecia" "liczbaGodzin"
+                           "opis"]},
+         :model "WpisKartyPracy",
+         :read
+           {:additional-query
+              "sorta(\"miesiac\")sorta(\"dzien\")filter(\"pracownikId\"==<:user-id>)",
+            :fields ["dzien" "miesiac" "godzinaRozpoczecia" "liczbaGodzin"
+                     "opis"]}}]}
+    {:allowed-roles ["kadry" "admin"],
+     :name "dlaKadr",
+     :operations [{:create {:fields ["dzien" "miesiac" "godzinaRozpoczecia"
+                                     "liczbaGodzin" "opis"]},
+                   :delete true,
+                   :model "WpisKartyPracy",
+                   :read {:fields ["dzien" "miesiac" "godzinaRozpoczecia"
+                                   "liczbaGodzin" "pracownikId" "opis"],
+                          :model-fields ["pracownik"]},
+                   :update true}
+                  {:create {:fields ["numerBankowy" "miejsceZamieszkania"
+                                     "wynagrodzenieBruttoGodzinowe"]},
+                   :delete true,
+                   :model "DanePracownika",
+                   :read {:fields ["numerBankowy" "miejsceZamieszkania"
+                                   "pracownikId"
+                                   "wynagrodzenieBruttoGodzinowe"]},
+                   :update true}
+                  {:model "User",
+                   :model-fields ["wpisyPracownika"],
+                   :read {:fields ["username" "id"],
+                          :model-fields ["wpisyPracownika"]}}]}]}
+

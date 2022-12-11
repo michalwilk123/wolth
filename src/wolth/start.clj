@@ -1,7 +1,6 @@
 (ns wolth.start
   (:gen-class)
   (:require [io.pedestal.http :as http]
-            [io.pedestal.http.route :as route]
             [wolth.server.config :refer [wolth-routes]]
             [wolth.server.routes :as r]
             [wolth.server.utils :refer [app-path->app-name]]
@@ -36,6 +35,7 @@
 
 (def _person-application-path "test/system/person/person.app.edn")
 (def _todo-application-path "test/system/todo/todo.app.edn")
+(def _kartaPracy-application-path "test/system/karta_pracy/kartaPracy.app.edn")
 
 (defn configure-wolth
   [& app-paths]
@@ -55,7 +55,8 @@
 
 (comment
   (configure-wolth _person-application-path)
-  (configure-wolth _todo-application-path))
+  (configure-wolth _todo-application-path)
+  (configure-wolth _kartaPracy-application-path))
 
 
 (defn init-server

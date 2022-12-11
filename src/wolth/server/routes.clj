@@ -10,7 +10,8 @@
             [wolth.server.path :refer [create-query-name]]
             [wolth.server.utils :refer [utility-interceptor actions-lut]]
             [wolth.server.-test-data :refer
-             [_test-app-data-w-relations _serializers_test_app_data]]
+             [_test-app-data-w-relations _serializers_test_app_data
+              _test-app-data-w-relations-v2]]
             [io.pedestal.http.body-params :as body-params]
             [wolth.server.resolvers :refer [wolth-resolver-interceptor]]
             [io.pedestal.http :as http]
@@ -56,6 +57,7 @@
   (get-model-fields-from-serializer (first (_test-app-data-w-relations
                                              :serializers))))
 
+;; TODO: TUTAJ DODAJ TABELE Z UZYTKOWNIKAMI
 (defn- get-relation-structure
   [app-datas]
   (->> app-datas
@@ -71,7 +73,8 @@
        (into {})))
 
 (comment
-  (get-relation-structure (_test-app-data-w-relations :objects)))
+  (get-relation-structure (_test-app-data-w-relations :objects))
+  (get-relation-structure (_test-app-data-w-relations-v2 :objects)))
 
 (defn get-method-intersection
   [obj-list flat-struct]
@@ -118,6 +121,9 @@
 (comment
   (create-intermediate-route-structure (_test-app-data-w-relations :objects)
                                        (first (_test-app-data-w-relations
+                                                :serializers)))
+  (create-intermediate-route-structure (_test-app-data-w-relations-v2 :objects)
+                                       (first (_test-app-data-w-relations-v2
                                                 :serializers)))
   (create-intermediate-route-structure (_serializers_test_app_data :objects)
                                        (first (_serializers_test_app_data
@@ -189,6 +195,9 @@
   (generate-routes-for-serializers "person"
                                    (_serializers_test_app_data :objects)
                                    (_serializers_test_app_data :serializers))
+  (generate-routes-for-serializers "kartaPracy"
+                                   (_test-app-data-w-relations-v2 :objects)
+                                   (_test-app-data-w-relations-v2 :serializers))
   (generate-routes-for-serializers "geoapp"
                                    (_test-app-data-w-relations :objects)
                                    (_test-app-data-w-relations :serializers)))
