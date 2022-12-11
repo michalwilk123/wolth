@@ -1,0 +1,11 @@
+{:database-configuration {:dbname "hello", :dbtype "h2"},
+ :functions [{:allowed-roles true,
+              :arg-source :body,
+              :arguments [["wartosc" :string]],
+              :function-name "witajFn",
+              :method :get,
+              :name "witajSwiecie",
+              :path "testFn.clj"}],
+ :meta {:admin {:name "lorem", :password "haslo"}}
+ :serializers []
+ :objects []}
