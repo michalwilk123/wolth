@@ -3,6 +3,7 @@
             [wolth.db.fields :refer [value-normalization-lut]]
             [wolth.server.utils :refer [operations-lut]]
             [wolth.utils.common :as help]
+            [wolth.server.bank :refer [normalizers]]
             [clojure.pprint :refer [pprint]]
             [wolth.utils.loader :refer [load-application!]]))
 
@@ -14,6 +15,7 @@
 (s/def ::password string?)
 (s/def ::author string?)
 (s/def ::type (partial contains? help/field-lut))
+(s/def ::fn-type (partial contains? normalizers))
 (s/def ::constraints
   (s/coll-of (partial contains? help/constraints-lut)
              :kind vector?
@@ -32,7 +34,7 @@
 
 (s/def ::method (partial contains? operations-lut))
 (s/def ::arguments
-  (s/coll-of (s/tuple string? ::type) :distinct true :kind vector?))
+  (s/coll-of (s/tuple string? ::fn-type) :distinct true :kind vector?))
 (s/def ::attached
   (s/coll-of (s/tuple
                string?
@@ -95,10 +97,12 @@
 
 (def _person-application-path "test/system/person/person.app.edn")
 (def _todo-application-path "test/system/todo/todo.app.edn")
+(def _hello_application-path "test/system/hello.app.edn")
 
 (comment
   (def _person-app-data (load-application! _person-application-path))
   (def _todo-app-data (load-application! _todo-application-path))
+  (def _hello-app-data (load-application! _hello_application-path))
   (s/explain ::meta (_todo-app-data :meta))
   (s/explain ::meta (_person-app-data :meta))
   (s/explain ::serializers (_person-app-data :serializers))
@@ -132,5 +136,7 @@
 (comment
   (wolth-config-valid? _todo-app-data)
   (wolth-config-valid? _person-app-data)
+  (wolth-config-valid? _hello-app-data)
+  (explain-wolth-spec _hello-app-data)
   (explain-wolth-spec _todo-app-data)
   (explain-wolth-spec _person-app-data))

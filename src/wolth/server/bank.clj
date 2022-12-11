@@ -15,7 +15,7 @@
    :float (create-reg-matcher #"(([1-9]+[0-9]*)|0)(\.[0-9]*)?")})
 
 ; https://stackoverflow.com/questions/35199808
-(def ^:private normalizers
+(def normalizers
   {:int #(Integer/parseInt %), :string identity, :float #(Float/parseFloat %)})
 
 (defn- validation-successful?
